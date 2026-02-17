@@ -1,46 +1,50 @@
 package cmd
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/MagicLex/hopsworks-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
+
+//go:embed templates/skill.md
+var skillTemplate string
 
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Set up Claude Code integration",
 	Long: `Initialize hops for use with Claude Code.
 
-Creates a /hops skill and configures permissions so Claude can use hops commands directly.
-Run this in any directory where you use Claude Code.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		home, _ := os.UserHomeDir()
+Creates .claude/skills/hops/SKILL.md with feature store context and CLI reference,
+so Claude Code can query your data, explore feature groups, and manage the feature store.
 
-		// 1. Create .claude/commands/hops.md skill file
-		skillDir := filepath.Join(home, ".claude", "commands")
+Run this in any project directory where you use Claude Code.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// 1. Write skill file to .claude/skills/hops/SKILL.md (project-level)
+		skillDir := filepath.Join(".claude", "skills", "hops")
 		if err := os.MkdirAll(skillDir, 0755); err != nil {
 			return fmt.Errorf("create skill dir: %w", err)
 		}
 
-		skillContent := generateSkillContent()
-		skillPath := filepath.Join(skillDir, "hops.md")
-		if err := os.WriteFile(skillPath, []byte(skillContent), 0644); err != nil {
-			return fmt.Errorf("write skill file: %w", err)
+		skillPath := filepath.Join(skillDir, "SKILL.md")
+		if _, err := os.Stat(skillPath); err == nil {
+			output.Info("Overwriting existing skill at %s", skillPath)
 		}
-		output.Success("Created skill: %s", skillPath)
 
-		// 2. Update .claude/settings.json to allow hops commands
-		settingsPath := filepath.Join(home, ".claude", "settings.json")
-		if err := updateSettings(settingsPath); err != nil {
-			output.Info("Note: Could not update settings.json: %v", err)
-			output.Info("Add 'Bash(hops *)' to your allowed commands manually")
+		if err := os.WriteFile(skillPath, []byte(skillTemplate), 0644); err != nil {
+			return fmt.Errorf("write skill: %w", err)
+		}
+		output.Success("Installed skill: %s", skillPath)
+
+		// 2. Add Bash(hops *) permission to .claude/settings.local.json (project-level)
+		if err := ensureHopsPermission(); err != nil {
+			output.Info("Could not update settings: %v — add 'Bash(hops *)' manually", err)
 		} else {
-			output.Success("Updated permissions: %s", settingsPath)
+			output.Success("Updated permissions: .claude/settings.local.json")
 		}
 
 		// 3. Detect environment
@@ -51,116 +55,47 @@ Run this in any directory where you use Claude Code.`,
 		}
 
 		output.Info("")
-		output.Success("Done! Use /hops in Claude Code to get started.")
-		output.Info("Claude can now run hops commands directly.")
+		output.Success("Done! Open Claude Code in this directory — type /hops or ask about your feature store.")
 		return nil
 	},
 }
 
-func generateSkillContent() string {
-	return `You have access to the hops CLI for interacting with Hopsworks Feature Store.
-Use hops commands via Bash to explore and manage feature store resources.
+// ensureHopsPermission adds Bash(hops *) to .claude/settings.local.json if not already present.
+func ensureHopsPermission() error {
+	settingsPath := filepath.Join(".claude", "settings.local.json")
 
-## Setup
-First, check if hops is configured:
-` + "```bash" + `
-hops project list
-` + "```" + `
+	const hopsPerm = "Bash(hops *)"
 
-If not configured, the user needs to run:
-` + "```bash" + `
-hops login
-hops project use <project-name>
-` + "```" + `
-
-## Getting Context
-Always start by understanding what's available:
-` + "```bash" + `
-hops context
-` + "```" + `
-
-## Quick Reference
-
-### Feature Groups
-` + "```bash" + `
-hops fg list                              # List all feature groups
-hops fg info <name> [--version N]         # Show details + schema
-hops fg preview <name> [--n 10]           # Preview data rows
-hops fg features <name>                   # List features with types
-hops fg create <name> --version 1 --primary-key id  # Create new
-` + "```" + `
-
-### Feature Views
-` + "```bash" + `
-hops fv list                              # List all feature views
-hops fv info <name> [--version N]         # Show details
-hops fv create <name> --version 1 --feature-group <fg-name>  # Create new
-` + "```" + `
-
-### Training Datasets
-` + "```bash" + `
-hops td list <fv-name> <fv-version>       # List training datasets
-hops td create <fv-name> <fv-version>     # Create training dataset
-` + "```" + `
-
-### Other
-` + "```bash" + `
-hops project list                         # List projects
-hops project use <name>                   # Switch project
-hops fs list                              # List feature stores
-hops job list                             # List jobs
-hops dataset list [path]                  # Browse files
-` + "```" + `
-
-## Tips
-- Use --json flag when you need to parse output programmatically
-- Run hops context first to understand the current state
-- Feature group names are case-sensitive
-`
-}
-
-func updateSettings(path string) error {
-	var settings map[string]interface{}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		// Create new settings
-		settings = make(map[string]interface{})
-	} else {
+	settings := make(map[string]interface{})
+	if data, err := os.ReadFile(settingsPath); err == nil {
 		if err := json.Unmarshal(data, &settings); err != nil {
-			return fmt.Errorf("parse settings: %w", err)
+			return fmt.Errorf("parse %s: %w", settingsPath, err)
 		}
 	}
 
-	// Get or create permissions.allow array
-	permissions, ok := settings["permissions"].(map[string]interface{})
-	if !ok {
-		permissions = make(map[string]interface{})
+	perms, _ := settings["permissions"].(map[string]interface{})
+	if perms == nil {
+		perms = make(map[string]interface{})
+		settings["permissions"] = perms
 	}
 
-	allow, ok := permissions["allow"].([]interface{})
-	if !ok {
-		allow = []interface{}{}
-	}
+	allowList, _ := perms["allow"].([]interface{})
 
-	// Check if hops is already allowed
-	hopsRule := "Bash(hops *)"
-	for _, rule := range allow {
-		if ruleStr, ok := rule.(string); ok && strings.Contains(ruleStr, "hops") {
-			return nil // Already configured
+	for _, item := range allowList {
+		if s, ok := item.(string); ok && s == hopsPerm {
+			return nil
 		}
 	}
 
-	allow = append(allow, hopsRule)
-	permissions["allow"] = allow
-	settings["permissions"] = permissions
+	allowList = append(allowList, hopsPerm)
+	perms["allow"] = allowList
 
-	out, err := json.MarshalIndent(settings, "", "  ")
+	data, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(path, out, 0644)
+	return os.WriteFile(settingsPath, append(data, '\n'), 0644)
 }
 
 func init() {
