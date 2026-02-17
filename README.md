@@ -9,7 +9,11 @@ Build a great CLI, and both humans and LLMs benefit. `hops` is the simplest way 
 ## Install
 
 ```bash
-go build -o hops .
+# From source
+go build -o hops . && sudo mv hops /usr/local/bin/
+
+# Or via go install
+go install github.com/MagicLex/hopsworks-cli@latest && mv ~/go/bin/hopsworks-cli ~/go/bin/hops
 ```
 
 ## Quick Start
