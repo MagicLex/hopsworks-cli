@@ -193,16 +193,31 @@ var fgFeaturesCmd = &cobra.Command{
 }
 
 var (
-	fgCreatePK      string
-	fgCreateOnline  bool
-	fgCreateEvtTime string
-	fgCreateDesc    string
+	fgCreatePK       string
+	fgCreateOnline   bool
+	fgCreateEvtTime  string
+	fgCreateDesc     string
+	fgCreateFeatures string
+	fgCreateFormat   string
 )
 
 var fgCreateCmd = &cobra.Command{
 	Use:   "create <name>",
 	Short: "Create a feature group",
-	Args:  cobra.ExactArgs(1),
+	Long: `Create a feature group with schema.
+
+Examples:
+  # Minimal (PK only, string types)
+  hops fg create users --primary-key user_id
+
+  # Full schema with types
+  hops fg create transactions \
+    --primary-key customer_id \
+    --features "customer_id:bigint,age:bigint,total_spent:double,is_premium:boolean,event_time:timestamp" \
+    --event-time event_time \
+    --online \
+    --description "Customer transaction features"`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if fgVersion == 0 {
 			fgVersion = 1
@@ -216,24 +231,47 @@ var fgCreateCmd = &cobra.Command{
 			return err
 		}
 
-		// Build minimal feature list from primary keys
 		pks := splitComma(fgCreatePK)
-		var features []client.Feature
+		pkSet := make(map[string]bool)
 		for _, pk := range pks {
-			features = append(features, client.Feature{
-				Name:    pk,
-				Type:    "string",
-				Primary: true,
-			})
+			pkSet[pk] = true
+		}
+
+		var features []client.Feature
+		if fgCreateFeatures != "" {
+			// Parse "name:type,name:type,..." format
+			for _, spec := range splitComma(fgCreateFeatures) {
+				parts := splitStr(trimSpace(spec), ":")
+				name := trimSpace(parts[0])
+				typ := "string"
+				if len(parts) > 1 {
+					typ = trimSpace(parts[1])
+				}
+				features = append(features, client.Feature{
+					Name:    name,
+					Type:    typ,
+					Primary: pkSet[name],
+				})
+			}
+		} else {
+			// Minimal: just primary keys
+			for _, pk := range pks {
+				features = append(features, client.Feature{
+					Name:    pk,
+					Type:    "string",
+					Primary: true,
+				})
+			}
 		}
 
 		req := &client.CreateFeatureGroupRequest{
-			Name:          args[0],
-			Version:       fgVersion,
-			OnlineEnabled: fgCreateOnline,
-			EventTime:     fgCreateEvtTime,
-			Description:   fgCreateDesc,
-			Features:      features,
+			Name:             args[0],
+			Version:          fgVersion,
+			OnlineEnabled:    fgCreateOnline,
+			EventTime:        fgCreateEvtTime,
+			Description:      fgCreateDesc,
+			Features:         features,
+			TimeTravelFormat: fgCreateFormat,
 		}
 
 		fg, err := c.CreateFeatureGroup(req)
@@ -288,9 +326,11 @@ func init() {
 	fgFeaturesCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version")
 	fgCreateCmd.Flags().IntVar(&fgVersion, "version", 1, "Feature group version")
 	fgCreateCmd.Flags().StringVar(&fgCreatePK, "primary-key", "", "Primary key columns (comma-separated)")
+	fgCreateCmd.Flags().StringVar(&fgCreateFeatures, "features", "", "Feature schema: name:type,name:type,...")
 	fgCreateCmd.Flags().BoolVar(&fgCreateOnline, "online", false, "Enable online storage")
 	fgCreateCmd.Flags().StringVar(&fgCreateEvtTime, "event-time", "", "Event time column")
 	fgCreateCmd.Flags().StringVar(&fgCreateDesc, "description", "", "Description")
+	fgCreateCmd.Flags().StringVar(&fgCreateFormat, "format", "", "Time travel format: HUDI or DELTA (default: server decides)")
 	fgDeleteCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version to delete")
 
 	fgCmd.AddCommand(fgListCmd)

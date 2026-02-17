@@ -145,22 +145,31 @@ func (c *Client) PreviewFeatureGroup(fgID int, n int) ([]map[string]interface{},
 }
 
 type CreateFeatureGroupRequest struct {
-	Name          string    `json:"name"`
-	Version       int       `json:"version"`
-	Description   string    `json:"description,omitempty"`
-	OnlineEnabled bool      `json:"onlineEnabled"`
-	EventTime     string    `json:"eventTime,omitempty"`
-	Features      []Feature `json:"features"`
+	Name             string    `json:"name"`
+	Version          int       `json:"version"`
+	Description      string    `json:"description,omitempty"`
+	OnlineEnabled    bool      `json:"onlineEnabled"`
+	EventTime        string    `json:"eventTime,omitempty"`
+	Features         []Feature `json:"features"`
+	TimeTravelFormat string    `json:"timeTravelFormat,omitempty"`
+	Type             string    `json:"type"`
+	FeatureStoreID   int       `json:"featurestoreId"`
 }
 
 func (c *Client) CreateFeatureGroup(req *CreateFeatureGroupRequest) (*FeatureGroup, error) {
-	// Mark primary keys
+	// Set required fields from client config
+	if req.Type == "" {
+		req.Type = "cachedFeaturegroupDTO"
+	}
+	req.FeatureStoreID = c.Config.FeatureStoreID
+
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	data, err := c.Post(fmt.Sprintf("%s/featuregroups", c.FSPath()), bytes.NewReader(body))
+	path := fmt.Sprintf("%s/featuregroups", c.FSPath())
+	data, err := c.Post(path, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

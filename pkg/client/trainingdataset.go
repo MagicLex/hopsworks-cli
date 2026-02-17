@@ -41,7 +41,10 @@ func (c *Client) ListTrainingDatasets(fvName string, fvVersion int) ([]TrainingD
 }
 
 func (c *Client) CreateTrainingDataset(fvName string, fvVersion int, description string, dataFormat string) (*TrainingDataset, error) {
-	req := map[string]interface{}{}
+	req := map[string]interface{}{
+		"type":                "trainingDatasetDTO",
+		"trainingDatasetType": "HOPSFS_TRAINING_DATASET",
+	}
 	if description != "" {
 		req["description"] = description
 	}

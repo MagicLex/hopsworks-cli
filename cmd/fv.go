@@ -127,6 +127,11 @@ var fvCreateCmd = &cobra.Command{
 		var features []string
 		if fvCreateFeatures != "" {
 			features = splitComma(fvCreateFeatures)
+		} else {
+			// Default: include all features from the FG
+			for _, f := range fg.Features {
+				features = append(features, f.Name)
+			}
 		}
 
 		var labels []string
@@ -134,7 +139,7 @@ var fvCreateCmd = &cobra.Command{
 			labels = splitComma(fvCreateLabels)
 		}
 
-		fv, err := c.CreateFeatureView(args[0], fvVersion, fvCreateDesc, fg.ID, features, labels)
+		fv, err := c.CreateFeatureView(args[0], fvVersion, fvCreateDesc, fg, features, labels)
 		if err != nil {
 			return err
 		}

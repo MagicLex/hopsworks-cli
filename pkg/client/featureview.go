@@ -96,25 +96,52 @@ type CreateFeatureViewRequest struct {
 	} `json:"label,omitempty"`
 }
 
-func (c *Client) CreateFeatureView(name string, version int, description string, fgID int, features []string, labels []string) (*FeatureView, error) {
+func (c *Client) CreateFeatureView(name string, version int, description string, fg *FeatureGroup, features []string, labels []string) (*FeatureView, error) {
 	req := map[string]interface{}{
-		"name":    name,
-		"version": version,
+		"name":           name,
+		"version":        version,
+		"type":           "featureViewDTO",
+		"featurestoreId": c.Config.FeatureStoreID,
 	}
 	if description != "" {
 		req["description"] = description
 	}
 
+	// Build leftFeatureGroup with all required fields
+	leftFG := map[string]interface{}{
+		"id":             fg.ID,
+		"name":           fg.Name,
+		"version":        fg.Version,
+		"type":           "cachedFeaturegroupDTO",
+		"featurestoreId": c.Config.FeatureStoreID,
+		"onlineEnabled":  fg.OnlineEnabled,
+	}
+
 	query := map[string]interface{}{
-		"leftFeatureGroup": map[string]int{"id": fgID},
+		"leftFeatureGroup": leftFG,
+		"featureStoreId":   c.Config.FeatureStoreID,
+		"featureStoreName": c.Config.Project + "_featurestore",
+		"hiveEngine":       true,
 	}
-	if len(features) > 0 {
-		var leftFeatures []map[string]string
-		for _, f := range features {
-			leftFeatures = append(leftFeatures, map[string]string{"name": f})
+
+	// Build leftFeatures with full type info
+	var leftFeatures []map[string]interface{}
+	for _, fname := range features {
+		feat := map[string]interface{}{
+			"name":           fname,
+			"featureGroupId": fg.ID,
 		}
-		query["leftFeatures"] = leftFeatures
+		// Copy type from FG features if available
+		for _, fgf := range fg.Features {
+			if fgf.Name == fname {
+				feat["type"] = fgf.Type
+				feat["primary"] = fgf.Primary
+				break
+			}
+		}
+		leftFeatures = append(leftFeatures, feat)
 	}
+	query["leftFeatures"] = leftFeatures
 	req["query"] = query
 
 	if len(labels) > 0 {
