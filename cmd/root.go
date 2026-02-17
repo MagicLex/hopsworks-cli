@@ -9,6 +9,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version is set at build time via -ldflags
+var Version = "0.1.0"
+
 var (
 	cfg       *config.Config
 	flagHost   string
@@ -18,8 +21,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "hops",
-	Short: "Hopsworks CLI — for humans and LLMs",
+	Use:     "hops",
+	Short:   "Hopsworks CLI — for humans and LLMs",
+	Version: Version,
 	Long: `hops is a CLI for the Hopsworks Feature Store platform.
 
 Works for both humans (pretty tables) and LLMs (--json).
