@@ -112,6 +112,27 @@ func buildGenerateScript(fgName string, fgVersion int, features []client.Feature
 		colGens = append(colGens, fmt.Sprintf("    %q: %s,", f.Name, gen))
 	}
 
+	// Build PK list and event time for get_or_create
+	var pkNames []string
+	var eventTime string
+	for _, f := range features {
+		if f.Primary {
+			pkNames = append(pkNames, fmt.Sprintf("%q", f.Name))
+		}
+	}
+	for _, f := range features {
+		if strings.Contains(strings.ToLower(f.Type), "timestamp") || strings.Contains(f.Name, "event_time") {
+			eventTime = f.Name
+			break
+		}
+	}
+
+	pkList := "[" + strings.Join(pkNames, ", ") + "]"
+	etLine := ""
+	if eventTime != "" {
+		etLine = fmt.Sprintf("    event_time=%q,", eventTime)
+	}
+
 	return fmt.Sprintf(`
 import hopsworks
 import pandas as pd
@@ -120,13 +141,22 @@ from datetime import datetime, timedelta
 import warnings, logging
 warnings.filterwarnings("ignore")
 logging.getLogger("hsfs").setLevel(logging.WARNING)
+logging.getLogger("hopsworks").setLevel(logging.WARNING)
 
 np.random.seed(42)
 n = %d
 
 project = hopsworks.login()
 fs = project.get_feature_store()
-fg = fs.get_feature_group(%q, version=%d)
+
+# get_or_create ensures Kafka topic + materialization job exist
+fg = fs.get_or_create_feature_group(
+    name=%q,
+    version=%d,
+    primary_key=%s,
+%s
+    online_enabled=True,
+)
 
 data = {
 %s
@@ -136,10 +166,10 @@ print(f"Generated {len(df)} rows, inserting...")
 try:
     fg.insert(df, write_options=%s%s)
 except IndexError:
-    # First insert: commit_details is empty, stats computation fails — data is already written
+    # First insert on HUDI: commit_details empty, stats fail — data already written
     pass
 print(f"Successfully inserted {len(df)} rows into {fg.name} v{fg.version}")
-`, n, fgName, fgVersion, strings.Join(colGens, "\n"), writeOptionsSnippet(onlineOnly), storageSnippet(onlineOnly))
+`, n, fgName, fgVersion, pkList, etLine, strings.Join(colGens, "\n"), writeOptionsSnippet(onlineOnly), storageSnippet(onlineOnly))
 }
 
 // columnGenerator returns a numpy expression to generate sample data for a feature type.
@@ -191,7 +221,7 @@ warnings.filterwarnings("ignore")
 
 project = hopsworks.login()
 fs = project.get_feature_store()
-fg = fs.get_feature_group(%q, version=%d)
+fg = fs.get_or_create_feature_group(name=%q, version=%d)
 
 file_path = %q
 if file_path.endswith('.csv'):
@@ -226,7 +256,7 @@ warnings.filterwarnings("ignore")
 
 project = hopsworks.login()
 fs = project.get_feature_store()
-fg = fs.get_feature_group(%q, version=%d)
+fg = fs.get_or_create_feature_group(name=%q, version=%d)
 
 raw = sys.stdin.read()
 data = json.loads(raw)
