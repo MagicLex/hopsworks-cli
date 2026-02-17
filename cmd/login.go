@@ -17,6 +17,13 @@ var loginCmd = &cobra.Command{
 	Short: "Authenticate with Hopsworks",
 	Long:  `Login to a Hopsworks instance. Validates the API key and saves config to ~/.hops/config.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if cfg.Internal {
+			output.Success("Internal mode — already authenticated via JWT")
+			output.Info("  Host: %s", cfg.Host)
+			output.Info("  Project: %s", cfg.Project)
+			return nil
+		}
+
 		// Prompt for host if not set
 		if cfg.Host == "" {
 			fmt.Print("Hopsworks host (e.g. app.hopsworks.ai): ")

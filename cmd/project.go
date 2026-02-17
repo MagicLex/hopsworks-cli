@@ -75,11 +75,14 @@ var projectUseCmd = &cobra.Command{
 			return fmt.Errorf("resolve feature store: %w", err)
 		}
 
-		if err := cfg.Save(); err != nil {
-			return fmt.Errorf("save config: %w", err)
+		// Internal mode: don't persist (env vars are the source of truth)
+		if !cfg.Internal {
+			if err := cfg.Save(); err != nil {
+				return fmt.Errorf("save config: %w", err)
+			}
 		}
 
-		output.Success("Active project: %s (ID: %d, FS: %d)", cfg.Project, cfg.ProjectID, cfg.FeatureStoreID)
+		output.Success("Active project: %s (ID: %d, FS: %d) [%s]", cfg.Project, cfg.ProjectID, cfg.FeatureStoreID, cfg.Mode())
 		return nil
 	},
 }
@@ -110,6 +113,10 @@ var projectInfoCmd = &cobra.Command{
 			return nil
 		}
 
+		auth := "api-key"
+		if cfg.Internal {
+			auth = "jwt"
+		}
 		output.Table(
 			[]string{"FIELD", "VALUE"},
 			[][]string{
@@ -117,6 +124,8 @@ var projectInfoCmd = &cobra.Command{
 				{"ID", strconv.Itoa(project.ProjectID)},
 				{"Description", project.Description},
 				{"Created", project.Created},
+				{"Mode", cfg.Mode()},
+				{"Auth", auth},
 			},
 		)
 		return nil

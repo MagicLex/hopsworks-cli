@@ -17,6 +17,7 @@ type Config struct {
 	Project        string `yaml:"project"`
 	ProjectID      int    `yaml:"project_id"`
 	FeatureStoreID int    `yaml:"feature_store_id"`
+	Internal       bool   `yaml:"-"` // Auto-detected, never persisted
 }
 
 func ConfigDir() string {
@@ -31,27 +32,39 @@ func ConfigPath() string {
 func Load() (*Config, error) {
 	cfg := &Config{}
 
-	// Environment variables override everything (in-platform detection)
-	if endpoint := os.Getenv("REST_ENDPOINT"); endpoint != "" {
-		cfg.Host = endpoint
-	}
-	if apiKey := os.Getenv("HOPSWORKS_API_KEY"); apiKey != "" {
-		cfg.APIKey = apiKey
-	}
-	if project := os.Getenv("PROJECT_NAME"); project != "" {
-		cfg.Project = project
-	}
-	if projectID := os.Getenv("HOPSWORKS_PROJECT_ID"); projectID != "" {
-		if id, err := strconv.Atoi(projectID); err == nil {
-			cfg.ProjectID = id
-		}
-	}
+	// Detect internal mode: inside a Hopsworks terminal pod
+	cfg.Internal = os.Getenv("REST_ENDPOINT") != "" && os.Getenv("SECRETS_DIR") != ""
 
-	// Load JWT token from secrets directory (in-platform)
-	if secretsDir := os.Getenv("SECRETS_DIR"); secretsDir != "" {
-		tokenPath := filepath.Join(secretsDir, "token.jwt")
+	if cfg.Internal {
+		cfg.Host = os.Getenv("REST_ENDPOINT")
+		if project := os.Getenv("PROJECT_NAME"); project != "" {
+			cfg.Project = project
+		}
+		if projectID := os.Getenv("HOPSWORKS_PROJECT_ID"); projectID != "" {
+			if id, err := strconv.Atoi(projectID); err == nil {
+				cfg.ProjectID = id
+			}
+		}
+		// JWT from secrets mount
+		tokenPath := filepath.Join(os.Getenv("SECRETS_DIR"), "token.jwt")
 		if tokenData, err := os.ReadFile(tokenPath); err == nil {
 			cfg.JWTToken = strings.TrimSpace(string(tokenData))
+		}
+	} else {
+		// External mode: env vars can still override config file
+		if endpoint := os.Getenv("REST_ENDPOINT"); endpoint != "" {
+			cfg.Host = endpoint
+		}
+		if apiKey := os.Getenv("HOPSWORKS_API_KEY"); apiKey != "" {
+			cfg.APIKey = apiKey
+		}
+		if project := os.Getenv("PROJECT_NAME"); project != "" {
+			cfg.Project = project
+		}
+		if projectID := os.Getenv("HOPSWORKS_PROJECT_ID"); projectID != "" {
+			if id, err := strconv.Atoi(projectID); err == nil {
+				cfg.ProjectID = id
+			}
 		}
 	}
 
@@ -97,7 +110,14 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("no host configured. Run 'hops login' or set REST_ENDPOINT")
 	}
 	if c.APIKey == "" && c.JWTToken == "" {
-		return fmt.Errorf("no API key or JWT token configured. Run 'hops login' or set HOPSWORKS_API_KEY")
+		return fmt.Errorf("no API key or JWT token. Run 'hops login' or set HOPSWORKS_API_KEY")
 	}
 	return nil
+}
+
+func (c *Config) Mode() string {
+	if c.Internal {
+		return "internal"
+	}
+	return "external"
 }
