@@ -7,33 +7,25 @@ import (
 )
 
 type DatasetFile struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-	Dir  bool   `json:"dir"`
-	Size int64  `json:"size"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	DatasetType string `json:"datasetType,omitempty"`
+	Dir         bool   `json:"dir"`
+	Size        int64  `json:"size"`
 }
 
-type DatasetAttributes struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-	Dir  bool   `json:"dir"`
-	Size int64  `json:"size"`
+type datasetAPIItem struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	DatasetType string `json:"datasetType"`
 }
 
-type DatasetItem struct {
-	Attributes DatasetAttributes `json:"attributes"`
-}
-
-type DatasetList struct {
-	Items []DatasetItem `json:"items"`
-	Count int           `json:"count"`
+type datasetAPIList struct {
+	Items []datasetAPIItem `json:"items"`
+	Count int              `json:"count"`
 }
 
 func (c *Client) ListDatasets(path string) ([]DatasetFile, error) {
-	if path == "" {
-		path = ""
-	}
-	// Clean path
 	path = strings.TrimPrefix(path, "/")
 
 	apiPath := fmt.Sprintf("%s/dataset/%s?action=listing&offset=0&limit=100", c.ProjectPath(), path)
@@ -42,23 +34,19 @@ func (c *Client) ListDatasets(path string) ([]DatasetFile, error) {
 		return nil, err
 	}
 
-	var dsList DatasetList
-	if err := json.Unmarshal(data, &dsList); err == nil && dsList.Items != nil {
-		var files []DatasetFile
-		for _, item := range dsList.Items {
-			files = append(files, DatasetFile{
-				Name: item.Attributes.Name,
-				Path: item.Attributes.Path,
-				Dir:  item.Attributes.Dir,
-				Size: item.Attributes.Size,
-			})
-		}
-		return files, nil
+	var dsList datasetAPIList
+	if err := json.Unmarshal(data, &dsList); err != nil {
+		return nil, fmt.Errorf("parse datasets: %w", err)
 	}
 
 	var files []DatasetFile
-	if err := json.Unmarshal(data, &files); err != nil {
-		return nil, fmt.Errorf("parse datasets: %w", err)
+	for _, item := range dsList.Items {
+		files = append(files, DatasetFile{
+			Name:        item.Name,
+			Description: item.Description,
+			DatasetType: item.DatasetType,
+			Dir:         item.DatasetType == "DATASET",
+		})
 	}
 	return files, nil
 }

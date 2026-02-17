@@ -1,8 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-	"strconv"
+	"strings"
 
 	"github.com/MagicLex/hopsworks-cli/pkg/output"
 	"github.com/spf13/cobra"
@@ -37,14 +36,14 @@ var datasetListCmd = &cobra.Command{
 			return nil
 		}
 
-		headers := []string{"NAME", "TYPE", "SIZE"}
+		headers := []string{"NAME", "TYPE"}
 		var rows [][]string
 		for _, f := range files {
-			t := "file"
-			if f.Dir {
-				t = "dir"
+			t := strings.ToLower(f.DatasetType)
+			if t == "" {
+				t = "file"
 			}
-			rows = append(rows, []string{f.Name, t, humanSize(f.Size)})
+			rows = append(rows, []string{f.Name, t})
 		}
 		output.Table(headers, rows)
 		return nil
@@ -68,24 +67,6 @@ var datasetMkdirCmd = &cobra.Command{
 		output.Success("Created directory: %s", args[0])
 		return nil
 	},
-}
-
-func humanSize(bytes int64) string {
-	if bytes == 0 {
-		return "-"
-	}
-	units := []string{"B", "KB", "MB", "GB", "TB"}
-	size := float64(bytes)
-	i := 0
-	for size >= 1024 && i < len(units)-1 {
-		size /= 1024
-		i++
-	}
-	if i == 0 {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	s := strconv.FormatFloat(size, 'f', 1, 64)
-	return s + " " + units[i]
 }
 
 func init() {
