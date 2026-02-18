@@ -17,10 +17,16 @@ Status: in progress
 - [x] Tested against live cluster (endpoint works, no data yet to show real stats)
 
 ## Blocker: Insert data to test stats end-to-end
-- [ ] Get `hops fg insert --generate 50` working from terminal pod
-  - Terminal JWT expires — need fresh session
-  - Binary published at GitHub releases v0.2.0
-  - From terminal: `curl -L .../hops-linux-amd64 -o ~/hops && chmod +x ~/hops`
+- [x] Build hops from source (v0.2.0 installed at ~/hops-bin)
+- [x] FG recreated as DELTA (was HUDI, incompatible with 4.8 backend)
+- [x] JKS certs extracted to PEM at ~/.hopsfs_pems/ (client_key.pem, client_cert.pem, ca_chain.pem)
+- [x] TLS connection to NameNode working with PEMS_DIR env var
+- [ ] Fix HDFS write permissions (user lexterm__meb10000 can't write to /apps/hive/warehouse/)
+- [ ] Fix SDK bugs upstream (see docs/SDK-FIXES.md):
+  - commit_details IndexError on first insert (fixed in fork, not installed)
+  - delta_engine skips PEMS_DIR for internal clients (fixed in fork, not installed)
+- [ ] Install patched SDK (system hsfs is root-owned — need terminal image rebuild or PYTHONPATH override)
+- [ ] End-to-end test: insert → preview → stats
 
 ---
 
