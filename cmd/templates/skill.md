@@ -1,6 +1,6 @@
 ---
 name: hops
-description: Use when working with Hopsworks Feature Store — listing and managing feature groups, feature views, training datasets, projects, jobs, and datasets. Auto-invoke when the user discusses feature engineering, feature store operations, ML pipelines, or needs to interact with Hopsworks.
+description: Use when working with Hopsworks Feature Store — listing and managing feature groups, feature views, training datasets, models, deployments, projects, jobs, and datasets. Auto-invoke when the user discusses feature engineering, feature store operations, ML pipelines, model serving, or needs to interact with Hopsworks.
 allowed-tools: Bash(hops *)
 ---
 
@@ -199,6 +199,45 @@ hops td read <fv-name> <fv-version> --td-version N  # Read training data
 hops td read <fv-name> <fv-version> --td-version N --split train --output train.csv
 hops td delete <fv-name> <fv-version> <td-version>  # Delete
 ```
+
+### Models
+```bash
+hops model list                           # List models in registry
+hops model info <name> [--version N]      # Show model details + metrics
+hops model register <name> <path>         # Register model + upload artifacts
+hops model download <name> [--output dir] # Download model artifacts
+hops model delete <name> --version N      # Delete model version
+```
+Flags for register:
+- `--framework <python|sklearn|tensorflow|torch>` — model framework (default: python)
+- `--metrics "key=value,..."` — training metrics
+- `--description <text>` — model description
+- `--feature-view <name>` — link to feature view (provenance)
+- `--td-version <n>` — training dataset version
+- `--version <n>` — model version (default: auto-increment)
+
+### Deployments
+```bash
+hops deployment list                      # List all deployments
+hops deployment info <name>               # Show deployment details
+hops deployment create <model-name>       # Create deployment from model
+hops deployment start <name>              # Start a deployment
+hops deployment stop <name>               # Stop a deployment
+hops deployment predict <name> --data '{"instances": [...]}' # Send prediction
+hops deployment logs <name>               # View deployment logs
+hops deployment delete <name>             # Delete a deployment
+```
+Alias: `hops deploy list`, `hops deploy create`, etc.
+
+Flags for create:
+- `--version <n>` — model version (latest if omitted)
+- `--name <name>` — deployment name (default: sanitized model name)
+- `--instances <n>` — number of instances (default: 1)
+- `--script <path>` — custom predictor script
+
+Flags for logs:
+- `--tail <n>` — number of log lines (default: 50)
+- `--component <predictor|transformer>` — log component (default: predictor)
 
 ### Jobs
 ```bash
