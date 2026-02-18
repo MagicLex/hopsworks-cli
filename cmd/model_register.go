@@ -161,10 +161,11 @@ mr = project.get_model_registry()
 	if modelRegSchema != "" {
 		sb.WriteString("    model_schema=_model_schema,\n")
 	}
-	if modelRegProgram != "" {
-		sb.WriteString(fmt.Sprintf("    program=%q,\n", modelRegProgram))
-	}
 	sb.WriteString(")\n")
+
+	if modelRegProgram != "" {
+		sb.WriteString(fmt.Sprintf("model.program = %q\n", modelRegProgram))
+	}
 
 	sb.WriteString(fmt.Sprintf("\nmodel.save(%q)\n", path))
 	sb.WriteString(`print(f"Model '{model.name}' v{model.version} registered successfully", file=sys.stderr)
