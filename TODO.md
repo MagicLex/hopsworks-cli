@@ -4,9 +4,9 @@ Status: in progress
 
 ## What exists
 - **FG:** list, info, preview, features, create, delete, insert (Python SDK), stats, derive (join + provenance)
-- **FV:** list, info (shows source FGs + joins), create (multi-FG joins + transforms), delete
+- **FV:** list, info (shows source FGs + joins), create (multi-FG joins + transforms), get (online vectors), read (batch offline), delete
 - **Transformations:** list, create (file + inline @udf)
-- **TD:** list, create, delete
+- **TD:** list, create, compute (materialize with splits), read (retrieve with splits), delete
 - **Job:** list, status (with --wait polling)
 - **Other:** update (self-update from GitHub releases), --version, init (Claude Code integration)
 
@@ -67,13 +67,15 @@ Status: in progress
 - [x] `pkg/client/featureview.go` — FVTransformSpec, serializes transformationFunctions array
 - [x] End-to-end tested: list built-ins, create custom (file + inline), attach to FV
 
-## Phase 5: FV Query/Preview + Feature Vectors
-> Inspect what a feature view produces + online serving lookup.
+## Phase 5: FV Read/Get + TD Compute/Read — DONE
+> Pre-training data pipeline: online lookup, batch read, TD materialization + retrieval.
 
-- [ ] `cmd/fv.go` — `hops fv query <name> [--version N]` (show generated SQL)
-- [ ] `cmd/fv.go` — `hops fv preview <name> [--version N] [--n 10]` (batch read)
-- [ ] `cmd/fv.go` — `hops fv get <name> --entry "pk=value"` (online feature vector lookup)
-- [ ] Test against live cluster
+- [x] `cmd/fv_read.go` — `hops fv get <name> --entry "pk=value"` (online feature vector lookup)
+- [x] `cmd/fv_read.go` — `hops fv read <name> [--n N] [--output file]` (batch offline read)
+- [x] `cmd/td.go` — `hops td compute <fv> <ver> [--split "train:0.8,test:0.2"]` (materialize via SDK)
+- [x] `cmd/td.go` — `hops td read <fv> <ver> --td-version N [--split train] [--output file]` (retrieve TD)
+- [x] Shared helpers: `buildFVPreamble()`, `runPython()`, `pythonLiteral()` in `fv_read.go`
+- [x] End-to-end tested: fv get (online), fv read (batch+file+json), td compute (no-split + split), td read (full+split+file)
 
 ---
 

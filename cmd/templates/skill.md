@@ -101,6 +101,9 @@ Flags:
 hops fv list                              # List all feature views
 hops fv info <name> [--version N]         # Show details + source FGs + joins
 hops fv create <name> --feature-group <fg>  # Create from single FG
+hops fv get <name> --entry "pk=val"       # Online feature vector lookup
+hops fv read <name> [--n 100]             # Batch read (offline)
+hops fv read <name> --output data.parquet # Save batch to file
 hops fv delete <name> --version N         # Delete
 ```
 
@@ -133,6 +136,26 @@ Flags:
 - `--fg-version <n>` — base FG version (latest if omitted)
 - `--transform <spec>` — transform spec (repeatable): `"fn_name:column"`
 
+#### Online Feature Vector Lookup
+```bash
+hops fv get my_view --entry "id=42"
+hops fv get my_view --entry "id=1" --entry "id=2" --entry "id=3"
+```
+Requires FV built from online-enabled FGs. Uses `--entry "key=value"` (repeatable).
+
+#### Batch Read
+```bash
+hops fv read my_view                      # Print table
+hops fv read my_view --n 100              # Limit rows
+hops fv read my_view --output data.parquet
+hops fv read my_view --output data.csv
+hops fv read my_view --output data.json
+```
+Flags:
+- `--output <path>` — save to file (format from extension: .parquet, .csv, .json)
+- `--n <rows>` — limit rows
+- `--version <n>` — feature view version
+
 ### Transformations
 ```bash
 hops transformation list                         # List all transformation functions
@@ -148,7 +171,11 @@ Custom transforms are saved locally to `~/.hops/transformations/`.
 ### Training Datasets
 ```bash
 hops td list <fv-name> <fv-version>       # List training datasets
-hops td create <fv-name> <fv-version>     # Create training dataset
+hops td create <fv-name> <fv-version>     # Create training dataset (metadata only)
+hops td compute <fv-name> <fv-version>    # Materialize training data (Spark job)
+hops td compute <fv-name> <fv-version> --split "train:0.8,test:0.2"  # With splits
+hops td read <fv-name> <fv-version> --td-version N  # Read training data
+hops td read <fv-name> <fv-version> --td-version N --split train --output train.csv
 hops td delete <fv-name> <fv-version> <td-version>  # Delete
 ```
 
