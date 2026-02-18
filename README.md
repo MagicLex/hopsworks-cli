@@ -39,6 +39,13 @@ hops fv create enriched --feature-group transactions \
   --join "products LEFT product_id=id p_" \
   --transform "standard_scaler:amount"
 
+# Online feature vector lookup
+hops fv get my_view --entry "id=42"
+
+# Batch read from feature view
+hops fv read my_view --n 100
+hops fv read my_view --output data.parquet
+
 # Insert data
 hops fg insert customer_transactions --file data.csv
 hops fg insert customer_transactions --generate 100
@@ -46,6 +53,17 @@ hops fg insert customer_transactions --generate 100
 # Derive new FG from joins (with provenance tracking)
 hops fg derive enriched --base transactions \
   --join "products LEFT id" --primary-key id
+
+# Embeddings + similarity search
+hops fg create documents --primary-key doc_id \
+  --features "doc_id:bigint,title:string" \
+  --embedding "text_embedding:384:cosine"
+hops fg search documents --vector "0.1,0.2,..." --k 5
+
+# Training datasets (materialize + retrieve)
+hops td compute my_view 1
+hops td compute my_view 1 --split "train:0.8,test:0.2"
+hops td read my_view 1 --td-version 1 --output train.parquet
 
 # Transformations
 hops transformation list
@@ -65,10 +83,10 @@ hops context
 | `hops login` | Authenticate with Hopsworks |
 | `hops project list\|use\|info` | Manage projects |
 | `hops fs list` | List feature stores |
-| `hops fg list\|info\|preview\|features\|create\|delete\|insert\|derive` | Feature groups |
-| `hops fv list\|info\|create\|delete` | Feature views (joins + transforms) |
+| `hops fg list\|info\|preview\|features\|create\|delete\|insert\|derive\|search` | Feature groups (with embeddings + KNN) |
+| `hops fv list\|info\|create\|get\|read\|delete` | Feature views (joins + transforms + online/batch read) |
 | `hops transformation list\|create` | Transformation functions |
-| `hops td list\|create\|delete` | Training datasets |
+| `hops td list\|create\|compute\|read\|delete` | Training datasets (materialize + retrieve with splits) |
 | `hops job list\|status` | Jobs (with `--wait` polling) |
 | `hops dataset list\|mkdir` | Browse project files |
 | `hops init` | Set up Claude Code integration |
