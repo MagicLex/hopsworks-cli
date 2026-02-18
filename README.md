@@ -1,6 +1,6 @@
-# hops — Hopsworks CLI for Humans and LLMs
+# hops — Hopsworks CLI
 
-A Go CLI for the Hopsworks Feature Store. Works as a standalone tool for humans and as an AI tool interface for LLMs — no MCP server needed.
+A Go CLI for the Hopsworks Feature Store. Works as a standalone tool and as an AI tool interface for LLMs.
 
 ## Philosophy
 
