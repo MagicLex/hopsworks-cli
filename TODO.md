@@ -8,7 +8,7 @@ Status: in progress
 - **Transformations:** list, create (file + inline @udf)
 - **TD:** list, create, compute (materialize with splits), read (retrieve with splits), delete
 - **Job:** list, status (with --wait polling)
-- **Model:** list, info, delete, register (Python SDK), download (Python SDK)
+- **Model:** list, info, delete, register (Python SDK, with provenance + schema + input example), download (Python SDK)
 - **Deployment:** list, info, create (REST), start, stop, delete, predict, logs
 - **Other:** update (self-update from GitHub releases), --version, init (Claude Code integration)
 
@@ -93,7 +93,7 @@ Status: in progress
 
 - [x] `pkg/client/model.go` — Model DTOs + list/get/delete methods
 - [x] `cmd/model.go` — `hops model list`, `info <name> [--version]`, `delete <name> --version`
-- [x] `cmd/model_register.go` — `hops model register <name> <path> --framework --metrics --description`
+- [x] `cmd/model_register.go` — `hops model register <name> <path> --framework --metrics --description --feature-view --td-version --input-example --schema --program`
 - [x] `cmd/model_register.go` — `hops model download <name> [--version] [--output dir]`
 - [x] `pkg/client/deployment.go` — Deployment DTOs + list/get/create/delete/action/logs/predict
 - [x] `cmd/deployment.go` — `hops deployment list/info/create/start/stop/delete/predict/logs`

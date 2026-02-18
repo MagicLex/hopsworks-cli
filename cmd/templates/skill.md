@@ -212,9 +212,14 @@ Flags for register:
 - `--framework <python|sklearn|tensorflow|torch>` — model framework (default: python)
 - `--metrics "key=value,..."` — training metrics
 - `--description <text>` — model description
-- `--feature-view <name>` — link to feature view (provenance)
-- `--td-version <n>` — training dataset version
+- `--feature-view <name>` — link to feature view (provenance + auto schema inference)
+- `--td-version <n>` — training dataset version (with --feature-view)
+- `--input-example <file>` — sample input file (JSON or CSV)
+- `--schema "in:name:type,... out:name:type,..."` — explicit input/output schema
+- `--program <file>` — training script path (stored as metadata)
 - `--version <n>` — model version (default: auto-increment)
+
+When `--feature-view` + `--td-version` are both set, the SDK auto-infers input/output schema from the training dataset features/labels.
 
 ### Deployments
 ```bash

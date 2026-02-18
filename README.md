@@ -76,6 +76,11 @@ hops dataset list
 hops model list
 hops model info fraud_detector --version 1
 hops model register fraud_detector ./model_dir --framework sklearn --metrics "accuracy=0.95"
+hops model register fraud_detector ./model_dir \
+  --feature-view my_view --td-version 1 \
+  --input-example sample.json \
+  --schema "in:age:int,salary:float out:prediction:float" \
+  --program train.py
 hops model download fraud_detector --output ./local_dir
 
 # Deployments (serving)
