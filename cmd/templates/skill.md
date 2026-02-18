@@ -11,16 +11,16 @@ You have access to the `hops` CLI to interact with the user's Hopsworks Feature 
 ## Current Context
 
 Project:
-!`hops project info --json 2>/dev/null || echo "No project selected — run: hops project use <name>"`
+!`hops project info --json 2>/dev/null`
 
 Feature Groups:
-!`hops fg list --json 2>/dev/null || echo "[]"`
+!`hops fg list --json 2>/dev/null`
 
 Feature Views:
-!`hops fv list --json 2>/dev/null || echo "[]"`
+!`hops fv list --json 2>/dev/null`
 
 Jobs:
-!`hops job list --json 2>/dev/null || echo "[]"`
+!`hops job list --json 2>/dev/null`
 
 ## Commands
 
