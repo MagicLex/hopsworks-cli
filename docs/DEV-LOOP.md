@@ -53,6 +53,12 @@ git add . && git commit -m "feat: ..." && git push origin main
 gh release create vX.Y.Z ./hops-linux-amd64 ./hops-darwin-arm64 --title "vX.Y.Z - ..."
 # or update:
 gh release upload vX.Y.Z ./hops-linux-amd64 ./hops-darwin-arm64 --clobber
+
+# Note: gh CLI isn't installed in terminal pod. Git credentials work for push
+# but lack read:org scope for gh auth. Use GitHub REST API with curl instead:
+#   TOKEN=$(cat ~/.git-credentials | head -1 | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
+#   curl -X POST "https://api.github.com/repos/MagicLex/hopsworks-cli/releases" \
+#     -H "Authorization: token $TOKEN" -d '{"tag_name":"vX.Y.Z",...}'
 ```
 
 ## 5. Test from Hopsworks terminal (internal mode)

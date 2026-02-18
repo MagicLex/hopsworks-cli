@@ -18,6 +18,10 @@ Hopsworks has two FG types with different write paths in the Python engine:
 - `hops fg create --online` → `streamFeatureGroupDTO`
 - `hops fg create` (no `--online`) → `cachedFeaturegroupDTO`
 
+**Insert modes:**
+- `hops fg insert <name> --generate N` → Kafka + materialization job (online + offline, waits for job)
+- `hops fg insert <name> --generate N --online-only` → Kafka only (online, instant, no Spark job)
+
 The SDK routes based on `feature_group.stream` attribute: `True` → Kafka path, `False` → direct Delta path.
 This is critical because creating an online-enabled FG with the wrong type (cached) means data goes to HDFS but the online store stays empty.
 
