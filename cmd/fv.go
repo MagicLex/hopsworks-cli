@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MagicLex/hopsworks-cli/pkg/client"
 	"github.com/MagicLex/hopsworks-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
@@ -79,9 +80,30 @@ var fvInfoCmd = &cobra.Command{
 		if len(fv.Labels) > 0 {
 			output.Info("Labels: %s", strings.Join(fv.Labels, ", "))
 		}
-		output.Info("")
+
+		// Fetch query to show source FGs
+		if qi, err := c.GetFeatureViewQuery(fv.Name, fv.Version); err == nil {
+			output.Info("Source: %s", qi.BaseFG)
+			for _, j := range qi.Joins {
+				prefix := ""
+				if j.Prefix != "" {
+					prefix = fmt.Sprintf(" (prefix: %s)", j.Prefix)
+				}
+				output.Info("  %s JOIN %s v%d%s", j.Type, j.FGName, j.Version, prefix)
+			}
+			if len(qi.Features) > 0 {
+				output.Info("")
+				headers := []string{"FEATURE"}
+				var rows [][]string
+				for _, f := range qi.Features {
+					rows = append(rows, []string{f})
+				}
+				output.Table(headers, rows)
+			}
+		}
 
 		if len(fv.Features) > 0 {
+			output.Info("")
 			headers := []string{"FEATURE", "TYPE"}
 			var rows [][]string
 			for _, f := range fv.Features {
@@ -99,12 +121,32 @@ var (
 	fvCreateFeatures string
 	fvCreateLabels   string
 	fvCreateDesc     string
+	fvCreateJoins    []string
 )
 
 var fvCreateCmd = &cobra.Command{
 	Use:   "create <name>",
 	Short: "Create a feature view",
-	Args:  cobra.ExactArgs(1),
+	Long: `Create a feature view from one or more feature groups.
+
+Examples:
+  # Single feature group
+  hops fv create my_view --feature-group transactions
+
+  # With joins
+  hops fv create enriched_view \
+    --feature-group transactions \
+    --join "products LEFT product_id=id p_" \
+    --description "Transactions with product info"
+
+  # Multiple joins
+  hops fv create full_view \
+    --feature-group orders \
+    --join "customers LEFT customer_id" \
+    --join "products LEFT product_id=id p_"
+
+Join spec: "<fg>[:<version>] <INNER|LEFT|RIGHT|FULL> <on>[=<right_on>] [prefix]"`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if fvCreateFG == "" {
 			return fmt.Errorf("--feature-group is required")
@@ -118,20 +160,46 @@ var fvCreateCmd = &cobra.Command{
 			return err
 		}
 
-		// Resolve feature group ID
-		fg, err := c.GetFeatureGroup(fvCreateFG, fvCreateFGVer)
+		// Resolve base feature group
+		baseName, baseVer := parseNameVersion(fvCreateFG)
+		if fvCreateFGVer > 0 {
+			baseVer = fvCreateFGVer
+		}
+		baseFG, err := c.GetFeatureGroup(baseName, baseVer)
 		if err != nil {
 			return fmt.Errorf("feature group '%s' not found: %w", fvCreateFG, err)
 		}
 
+		// Select features from base FG
 		var features []string
 		if fvCreateFeatures != "" {
 			features = splitComma(fvCreateFeatures)
 		} else {
-			// Default: include all features from the FG
-			for _, f := range fg.Features {
+			for _, f := range baseFG.Features {
 				features = append(features, f.Name)
 			}
+		}
+
+		// Parse joins
+		var joins []client.FVJoinSpec
+		for _, raw := range fvCreateJoins {
+			j, err := parseJoinSpec(raw)
+			if err != nil {
+				return err
+			}
+
+			joinFG, err := c.GetFeatureGroup(j.fgName, j.version)
+			if err != nil {
+				return fmt.Errorf("join feature group '%s' not found: %w", j.fgName, err)
+			}
+
+			joins = append(joins, client.FVJoinSpec{
+				FG:      joinFG,
+				LeftOn:  []string{j.leftOn},
+				RightOn: []string{j.rightOn},
+				Type:    strings.ToUpper(j.joinType),
+				Prefix:  j.prefix,
+			})
 		}
 
 		var labels []string
@@ -139,7 +207,7 @@ var fvCreateCmd = &cobra.Command{
 			labels = splitComma(fvCreateLabels)
 		}
 
-		fv, err := c.CreateFeatureView(args[0], fvVersion, fvCreateDesc, fg, features, labels)
+		fv, err := c.CreateFeatureView(args[0], fvVersion, fvCreateDesc, baseFG, features, labels, joins)
 		if err != nil {
 			return err
 		}
@@ -186,6 +254,7 @@ func init() {
 	fvCreateCmd.Flags().StringVar(&fvCreateFeatures, "features", "", "Selected features (comma-separated)")
 	fvCreateCmd.Flags().StringVar(&fvCreateLabels, "labels", "", "Label columns (comma-separated)")
 	fvCreateCmd.Flags().StringVar(&fvCreateDesc, "description", "", "Description")
+	fvCreateCmd.Flags().StringArrayVar(&fvCreateJoins, "join", nil, `Join spec: "<fg>[:<ver>] <INNER|LEFT|RIGHT|FULL> <on>[=<right_on>] [prefix]"`)
 	fvDeleteCmd.Flags().IntVar(&fvVersion, "version", 0, "Version to delete (all if omitted)")
 
 	fvCmd.AddCommand(fvListCmd)

@@ -78,25 +78,16 @@ func (c *Client) GetFeatureView(name string, version int) (*FeatureView, error) 
 	return &fv, nil
 }
 
-type CreateFeatureViewRequest struct {
-	Name             string `json:"name"`
-	Version          int    `json:"version"`
-	Description      string `json:"description,omitempty"`
-	FeatureStoreName string `json:"-"`
-	Query            struct {
-		LeftFeatureGroup struct {
-			ID int `json:"id"`
-		} `json:"leftFeatureGroup"`
-		LeftFeatures []struct {
-			Name string `json:"name"`
-		} `json:"leftFeatures"`
-	} `json:"query"`
-	Labels []struct {
-		Name string `json:"name"`
-	} `json:"label,omitempty"`
+// FVJoinSpec describes a join for feature view creation.
+type FVJoinSpec struct {
+	FG      *FeatureGroup
+	LeftOn  []string // join keys on the left (base) FG
+	RightOn []string // join keys on the right (joined) FG
+	Type    string   // "LEFT", "INNER", "RIGHT", "FULL"
+	Prefix  string   // optional prefix for right FG features
 }
 
-func (c *Client) CreateFeatureView(name string, version int, description string, fg *FeatureGroup, features []string, labels []string) (*FeatureView, error) {
+func (c *Client) CreateFeatureView(name string, version int, description string, baseFG *FeatureGroup, features []string, labels []string, joins []FVJoinSpec) (*FeatureView, error) {
 	req := map[string]interface{}{
 		"name":           name,
 		"version":        version,
@@ -107,41 +98,61 @@ func (c *Client) CreateFeatureView(name string, version int, description string,
 		req["description"] = description
 	}
 
-	// Build leftFeatureGroup with all required fields
-	leftFG := map[string]interface{}{
-		"id":             fg.ID,
-		"name":           fg.Name,
-		"version":        fg.Version,
-		"type":           "cachedFeaturegroupDTO",
-		"featurestoreId": c.Config.FeatureStoreID,
-		"onlineEnabled":  fg.OnlineEnabled,
-	}
+	fsName := c.Config.Project + "_featurestore"
 
+	// Build base query
 	query := map[string]interface{}{
-		"leftFeatureGroup": leftFG,
+		"leftFeatureGroup": c.buildFGRef(baseFG),
+		"leftFeatures":     c.buildFeatureList(baseFG, features),
 		"featureStoreId":   c.Config.FeatureStoreID,
-		"featureStoreName": c.Config.Project + "_featurestore",
+		"featureStoreName": fsName,
 		"hiveEngine":       true,
 	}
 
-	// Build leftFeatures with full type info
-	var leftFeatures []map[string]interface{}
-	for _, fname := range features {
-		feat := map[string]interface{}{
-			"name":           fname,
-			"featureGroupId": fg.ID,
-		}
-		// Copy type from FG features if available
-		for _, fgf := range fg.Features {
-			if fgf.Name == fname {
-				feat["type"] = fgf.Type
-				feat["primary"] = fgf.Primary
-				break
+	// Build joins array
+	if len(joins) > 0 {
+		var joinList []map[string]interface{}
+		for _, j := range joins {
+			// All features from the join FG
+			var rightFeatureNames []string
+			for _, f := range j.FG.Features {
+				rightFeatureNames = append(rightFeatureNames, f.Name)
 			}
+
+			joinQuery := map[string]interface{}{
+				"leftFeatureGroup": c.buildFGRef(j.FG),
+				"leftFeatures":     c.buildFeatureList(j.FG, rightFeatureNames),
+				"featureStoreId":   c.Config.FeatureStoreID,
+				"featureStoreName": fsName,
+				"hiveEngine":       true,
+				"joins":            []interface{}{},
+			}
+
+			joinEntry := map[string]interface{}{
+				"query": joinQuery,
+				"type":  j.Type,
+			}
+
+			// Join keys: "on" when same name, "leftOn"+"rightOn" when different
+			if len(j.LeftOn) > 0 && j.LeftOn[0] == j.RightOn[0] {
+				joinEntry["on"] = j.LeftOn
+				joinEntry["leftOn"] = []string{}
+				joinEntry["rightOn"] = []string{}
+			} else {
+				joinEntry["on"] = []string{}
+				joinEntry["leftOn"] = j.LeftOn
+				joinEntry["rightOn"] = j.RightOn
+			}
+
+			if j.Prefix != "" {
+				joinEntry["prefix"] = j.Prefix
+			}
+
+			joinList = append(joinList, joinEntry)
 		}
-		leftFeatures = append(leftFeatures, feat)
+		query["joins"] = joinList
 	}
-	query["leftFeatures"] = leftFeatures
+
 	req["query"] = query
 
 	if len(labels) > 0 {
@@ -167,6 +178,115 @@ func (c *Client) CreateFeatureView(name string, version int, description string,
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 	return &fv, nil
+}
+
+func (c *Client) buildFGRef(fg *FeatureGroup) map[string]interface{} {
+	fgType := "cachedFeaturegroupDTO"
+	if fg.OnlineEnabled {
+		fgType = "streamFeatureGroupDTO"
+	}
+	return map[string]interface{}{
+		"id":             fg.ID,
+		"name":           fg.Name,
+		"version":        fg.Version,
+		"type":           fgType,
+		"featurestoreId": c.Config.FeatureStoreID,
+		"onlineEnabled":  fg.OnlineEnabled,
+	}
+}
+
+func (c *Client) buildFeatureList(fg *FeatureGroup, names []string) []map[string]interface{} {
+	var list []map[string]interface{}
+	for _, fname := range names {
+		feat := map[string]interface{}{
+			"name":           fname,
+			"featureGroupId": fg.ID,
+		}
+		for _, fgf := range fg.Features {
+			if fgf.Name == fname {
+				feat["type"] = fgf.Type
+				feat["primary"] = fgf.Primary
+				break
+			}
+		}
+		list = append(list, feat)
+	}
+	return list
+}
+
+// FVQueryInfo holds the parsed query structure from a feature view.
+type FVQueryInfo struct {
+	BaseFG   string // "name v1"
+	Features []string
+	Joins    []FVQueryJoin
+}
+
+type FVQueryJoin struct {
+	FGName  string
+	Version int
+	Type    string // LEFT, INNER, etc.
+	Prefix  string
+}
+
+// GetFeatureViewQuery fetches the query definition for a feature view.
+func (c *Client) GetFeatureViewQuery(name string, version int) (*FVQueryInfo, error) {
+	path := fmt.Sprintf("%s/featureview/%s/version/%d/query", c.FSPath(), name, version)
+	data, err := c.Get(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("parse query: %w", err)
+	}
+
+	info := &FVQueryInfo{}
+
+	// Base FG
+	if lfg, ok := raw["leftFeatureGroup"].(map[string]interface{}); ok {
+		name, _ := lfg["name"].(string)
+		ver, _ := lfg["version"].(float64)
+		info.BaseFG = fmt.Sprintf("%s v%d", name, int(ver))
+	}
+
+	// Left features
+	if lf, ok := raw["leftFeatures"].([]interface{}); ok {
+		for _, f := range lf {
+			if fm, ok := f.(map[string]interface{}); ok {
+				if n, ok := fm["name"].(string); ok {
+					info.Features = append(info.Features, n)
+				}
+			}
+		}
+	}
+
+	// Joins
+	if joins, ok := raw["joins"].([]interface{}); ok {
+		for _, j := range joins {
+			jm, ok := j.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			join := FVQueryJoin{}
+			if jt, ok := jm["type"].(string); ok {
+				join.Type = jt
+			}
+			if prefix, ok := jm["prefix"].(string); ok {
+				join.Prefix = prefix
+			}
+			if jq, ok := jm["query"].(map[string]interface{}); ok {
+				if lfg, ok := jq["leftFeatureGroup"].(map[string]interface{}); ok {
+					join.FGName, _ = lfg["name"].(string)
+					ver, _ := lfg["version"].(float64)
+					join.Version = int(ver)
+				}
+			}
+			info.Joins = append(info.Joins, join)
+		}
+	}
+
+	return info, nil
 }
 
 func (c *Client) DeleteFeatureView(name string, version int) error {

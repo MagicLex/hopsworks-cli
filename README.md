@@ -40,6 +40,9 @@ hops fv create my_view --version 1 --feature-group customer_transactions
 hops fg insert customer_transactions --file data.csv
 hops fg insert customer_transactions --generate 100
 
+# Derive new FG from joins (with provenance tracking)
+hops fg derive enriched --base transactions --join "products LEFT id" --primary-key id
+
 # Browse files
 hops dataset list
 
@@ -54,7 +57,7 @@ hops context
 | `hops login` | Authenticate with Hopsworks |
 | `hops project list\|use\|info` | Manage projects |
 | `hops fs list` | List feature stores |
-| `hops fg list\|info\|preview\|features\|create\|delete\|insert` | Feature groups |
+| `hops fg list\|info\|preview\|features\|create\|delete\|insert\|derive` | Feature groups |
 | `hops fv list\|info\|create\|delete` | Feature views |
 | `hops td list\|create\|delete` | Training datasets |
 | `hops job list` | List jobs |

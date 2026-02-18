@@ -3,8 +3,8 @@
 Status: in progress
 
 ## What exists
-- **FG:** list, info, preview, features, create, delete, insert (Python SDK), stats
-- **FV:** list, info, create (single FG only), delete
+- **FG:** list, info, preview, features, create, delete, insert (Python SDK), stats, derive (join + provenance)
+- **FV:** list, info (shows source FGs + joins), create (single FG or multi-FG with joins), delete
 - **TD:** list, create, delete
 - **Job:** list, status (with --wait polling)
 - **Other:** update (self-update from GitHub releases), --version, init (Claude Code integration)
@@ -25,6 +25,17 @@ Status: in progress
 
 ---
 
+## Phase 1.5: FG Derive — DONE
+- [x] `cmd/fg_derive.go` — `hops fg derive <name> --base <fg> --join "<spec>" --primary-key <cols>`
+- [x] Join spec parser: `"<fg>[:<ver>] <INNER|LEFT|RIGHT|FULL> <on>[=<right_on>] [prefix]"`
+- [x] Multiple `--join` flags, optional `--online`, `--event-time`, `--features`, `--description`
+- [x] Provenance: passes `parents=[base_fg, join_fgs...]` for Hopsworks lineage graph
+- [x] Auto-generated description with derivation lineage when `--description` omitted
+- [x] Validates all source FGs exist via Go REST before running Python
+- [x] End-to-end tested: derive → preview → provenance graph (all working)
+
+---
+
 ## Phase 2: Storage Connectors + External FGs
 > Unlocks on-demand feature groups (JDBC, S3, etc.)
 
@@ -34,14 +45,15 @@ Status: in progress
 - [ ] `cmd/fg.go` — `hops fg create-external <name> --connector <name> --query "SQL" --features "col:type,..."`
 - [ ] Test against live cluster
 
-## Phase 3: FV Create with Joins
+## Phase 3: FV Create with Joins — DONE
 > Core structural change — multi-FG feature views.
 
-- [ ] `pkg/client/featureview.go` — QueryDTO, JoinDTO, update CreateFeatureView
-- [ ] `cmd/fv.go` — `--join "fg:JOIN_TYPE:left=right:prefix"` flag (repeatable)
-- [ ] `cmd/fv.go` — `--from query.json` for complex queries
-- [ ] Backwards compatible: existing `--feature-group` still works
-- [ ] Test against live cluster
+- [x] `pkg/client/featureview.go` — FVJoinSpec, nested query DTO, buildFGRef/buildFeatureList helpers
+- [x] `cmd/fv.go` — `--join "fg LEFT on[=right_on] [prefix]"` flag (repeatable, reuses parseJoinSpec)
+- [x] Backwards compatible: existing `--feature-group` still works (no joins = same as before)
+- [x] `fv info` shows source FGs + joins via `/query` sub-endpoint
+- [x] `GetFeatureViewQuery` client method parses query response
+- [x] End-to-end tested: single FG create, joined FV create, info display (all working)
 
 ## Phase 4: Transformations (list + reference only)
 > List existing, reference in FV. No Python UDF creation from Go.
