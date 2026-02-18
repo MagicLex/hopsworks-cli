@@ -58,6 +58,17 @@ kubectl get pods -n hopsworks | grep rss
 # Should see: rss-coordinator-rss-hops-{0,1} + rss-shuffle-server-rss-hops-0
 ```
 
+## Missing DDL Migrations
+If the deployed EAR is ahead of the DB schema, you get errors like `Unknown column 'X' in 'field list'`.
+
+Fix: apply manually via kubectl exec into mysqlds-0.
+
+Known missing migrations on this cluster:
+```bash
+# dev_mode column for terminal sessions (added in dev EAR, DDL not shipped)
+ALTER TABLE terminal_session ADD COLUMN dev_mode TINYINT(1) DEFAULT 0;
+```
+
 ## Ingress
 - Istio ingress gateway: `172.20.153.241`
 - Ports: 80 (HTTP), 443 (HTTPS), 4848 (Payara admin)

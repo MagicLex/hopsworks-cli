@@ -3,21 +3,26 @@
 Status: in progress
 
 ## What exists
-- **FG:** list, info, preview, features, create, delete, insert (Python SDK)
+- **FG:** list, info, preview, features, create, delete, insert (Python SDK), stats
 - **FV:** list, info, create (single FG only), delete
 - **TD:** list, create, delete
+- **Other:** update (self-update from GitHub releases), --version, init (Claude Code integration)
 
 ---
 
-## Phase 1: Statistics
-> No dependencies, immediate value.
+## Phase 1: Statistics — DONE
+- [x] `pkg/client/statistics.go` — DTOs + client methods
+- [x] `cmd/fg.go` — `hops fg stats <name> [--version N] [--features col1,col2]`
+- [x] `cmd/fg.go` — `hops fg stats <name> --compute` (trigger Spark job)
+- [x] Tested against live cluster (endpoint works, no data yet to show real stats)
 
-- [ ] `pkg/client/statistics.go` — DTOs + client methods (GET stats, POST compute)
-- [ ] `cmd/fg.go` — add `hops fg stats <name> [--version N] [--features col1,col2]`
-- [ ] `cmd/fg.go` — add `hops fg stats <name> --compute` (trigger Spark job)
-- [ ] Test against live cluster
+## Blocker: Insert data to test stats end-to-end
+- [ ] Get `hops fg insert --generate 50` working from terminal pod
+  - Terminal JWT expires — need fresh session
+  - Binary published at GitHub releases v0.2.0
+  - From terminal: `curl -L .../hops-linux-amd64 -o ~/hops && chmod +x ~/hops`
 
-REST: `GET/POST {FSPath}/featuregroups/{id}/statistics`
+---
 
 ## Phase 2: Storage Connectors + External FGs
 > Unlocks on-demand feature groups (JDBC, S3, etc.)
@@ -28,8 +33,6 @@ REST: `GET/POST {FSPath}/featuregroups/{id}/statistics`
 - [ ] `cmd/fg.go` — `hops fg create-external <name> --connector <name> --query "SQL" --features "col:type,..."`
 - [ ] Test against live cluster
 
-REST: `GET {FSPath}/storageconnectors`, `POST {FSPath}/featuregroups` (type=onDemandFeaturegroupDTO)
-
 ## Phase 3: FV Create with Joins
 > Core structural change — multi-FG feature views.
 
@@ -39,41 +42,28 @@ REST: `GET {FSPath}/storageconnectors`, `POST {FSPath}/featuregroups` (type=onDe
 - [ ] Backwards compatible: existing `--feature-group` still works
 - [ ] Test against live cluster
 
-REST: `POST {FSPath}/featureview` with QueryDTO containing joins list
-
 ## Phase 4: Transformations (list + reference only)
-> Creating Python UDFs from Go is impractical. List existing, reference in FV.
+> List existing, reference in FV. No Python UDF creation from Go.
 
 - [ ] `pkg/client/transformation.go` — TF DTOs + list
 - [ ] `cmd/transformation.go` — `hops transformation list`
 - [ ] `cmd/fv.go` — `--transformation "fn_name:feature"` flag
-- [ ] `pkg/client/featureview.go` — add TF refs to create request
 - [ ] Test against live cluster
-
-REST: `GET {FSPath}/transformationfunctions`
 
 ## Phase 5: FV Query/Preview
 > Inspect what a feature view actually produces.
 
-- [ ] `pkg/client/featureview.go` — GetFeatureViewQuery, PreviewFeatureView
 - [ ] `cmd/fv.go` — `hops fv query <name> [--version N]`
 - [ ] `cmd/fv.go` — `hops fv preview <name> [--version N] [--n 10]`
 - [ ] Test against live cluster
 
-REST: `GET {FSPath}/featureview/{name}/version/{version}/query`
-
 ---
 
-## Backend concerns
-1. Stats compute needs Spark — reading existing stats works, compute may need cluster resources
-2. External FG — same endpoint, different type field — needs live testing
-3. FV with QueryDTO — Python SDK does this already, no backend changes expected
-4. FV preview endpoint — verify it exists, fallback = show query
+## Known cluster issues
+- **RSS CRD missing** — apply `charts/spark/crds/uniffle.apache.org_remoteshuffleservices.yaml --server-side`, recreate from ConfigMap `rss-crd`, restart `rss-controller`. See `docs/CLUSTER-OPS.md`.
+- **DDL migration missing** — `terminal_session.dev_mode` column not in DB. Applied manually: `ALTER TABLE terminal_session ADD COLUMN dev_mode TINYINT(1) DEFAULT 0;`
+- **Terminal JWT expiry** — tokens expire after ~8h, restart terminal session to refresh.
+- **API key scope** — current key lacks SERVING scope, blocks Python SDK login locally. Use terminal pod instead.
 
 ## Dev loop
-1. Code (CLI / API / backend)
-2. `go build -o hops .` for CLI
-3. `mvn clean install -P kube-cluster,remote-user-auth,kube,cloud -DskipTests` for backend
-4. `./scripts/kube_redeploy_ear.sh` or Payara UI for deploy
-5. Test `hops` against real cluster
-6. Repeat
+See `docs/DEV-LOOP.md`
