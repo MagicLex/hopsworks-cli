@@ -67,11 +67,12 @@ Status: in progress
 - [x] `pkg/client/featureview.go` — FVTransformSpec, serializes transformationFunctions array
 - [x] End-to-end tested: list built-ins, create custom (file + inline), attach to FV
 
-## Phase 5: FV Query/Preview
-> Inspect what a feature view actually produces.
+## Phase 5: FV Query/Preview + Feature Vectors
+> Inspect what a feature view produces + online serving lookup.
 
-- [ ] `cmd/fv.go` — `hops fv query <name> [--version N]`
-- [ ] `cmd/fv.go` — `hops fv preview <name> [--version N] [--n 10]`
+- [ ] `cmd/fv.go` — `hops fv query <name> [--version N]` (show generated SQL)
+- [ ] `cmd/fv.go` — `hops fv preview <name> [--version N] [--n 10]` (batch read)
+- [ ] `cmd/fv.go` — `hops fv get <name> --entry "pk=value"` (online feature vector lookup)
 - [ ] Test against live cluster
 
 ---

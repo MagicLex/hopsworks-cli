@@ -32,16 +32,24 @@ hops fg info customer_transactions
 hops fg preview customer_transactions --n 5
 hops fg features customer_transactions
 
-# Feature views
+# Feature views (single FG or multi-FG joins + transforms)
 hops fv list
-hops fv create my_view --version 1 --feature-group customer_transactions
+hops fv create my_view --feature-group transactions
+hops fv create enriched --feature-group transactions \
+  --join "products LEFT product_id=id p_" \
+  --transform "standard_scaler:amount"
 
 # Insert data
 hops fg insert customer_transactions --file data.csv
 hops fg insert customer_transactions --generate 100
 
 # Derive new FG from joins (with provenance tracking)
-hops fg derive enriched --base transactions --join "products LEFT id" --primary-key id
+hops fg derive enriched --base transactions \
+  --join "products LEFT id" --primary-key id
+
+# Transformations
+hops transformation list
+hops transformation create --file my_scaler.py
 
 # Browse files
 hops dataset list
@@ -61,7 +69,7 @@ hops context
 | `hops fv list\|info\|create\|delete` | Feature views (joins + transforms) |
 | `hops transformation list\|create` | Transformation functions |
 | `hops td list\|create\|delete` | Training datasets |
-| `hops job list` | List jobs |
+| `hops job list\|status` | Jobs (with `--wait` polling) |
 | `hops dataset list\|mkdir` | Browse project files |
 | `hops init` | Set up Claude Code integration |
 | `hops context` | Dump project state for LLMs |
