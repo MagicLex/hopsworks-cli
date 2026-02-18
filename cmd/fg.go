@@ -11,6 +11,8 @@ import (
 
 var fgVersion int
 var fgPreviewN int
+var fgStatsFeatures string
+var fgStatsCompute bool
 
 var fgCmd = &cobra.Command{
 	Use:   "fg",
@@ -288,6 +290,101 @@ Examples:
 	},
 }
 
+var fgStatsCmd = &cobra.Command{
+	Use:   "stats <name>",
+	Short: "Show or compute feature group statistics",
+	Long: `Show computed statistics for a feature group, or trigger computation.
+
+Examples:
+  # Show latest stats
+  hops fg stats transactions
+
+  # Filter to specific features
+  hops fg stats transactions --features amount,age
+
+  # Trigger stats computation (Spark job)
+  hops fg stats transactions --compute`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := mustClient()
+		if err != nil {
+			return err
+		}
+
+		fg, err := c.GetFeatureGroup(args[0], fgVersion)
+		if err != nil {
+			return err
+		}
+
+		if fgStatsCompute {
+			job, err := c.ComputeFeatureGroupStatistics(fg.ID)
+			if err != nil {
+				return err
+			}
+			if output.JSONMode {
+				output.PrintJSON(job)
+				return nil
+			}
+			output.Success("Statistics computation job started (job: %s, id: %d)", job.Name, job.ID)
+			return nil
+		}
+
+		var featureNames []string
+		if fgStatsFeatures != "" {
+			featureNames = splitComma(fgStatsFeatures)
+		}
+
+		stats, err := c.GetFeatureGroupStatistics(fg.ID, featureNames)
+		if err != nil {
+			return err
+		}
+
+		if stats == nil {
+			if output.JSONMode {
+				output.PrintJSON(struct{}{})
+				return nil
+			}
+			output.Info("No statistics computed for '%s' v%d. Use --compute to trigger.", fg.Name, fg.Version)
+			return nil
+		}
+
+		if output.JSONMode {
+			output.PrintJSON(stats)
+			return nil
+		}
+
+		if stats.ComputationTime != nil {
+			output.Info("Statistics for '%s' v%d (computed: %d)", fg.Name, fg.Version, *stats.ComputationTime)
+		} else {
+			output.Info("Statistics for '%s' v%d", fg.Name, fg.Version)
+		}
+		output.Info("")
+
+		if len(stats.FeatureDescriptiveStatistics) == 0 {
+			output.Info("No feature statistics available")
+			return nil
+		}
+
+		headers := []string{"FEATURE", "TYPE", "COUNT", "MEAN", "MIN", "MAX", "STDDEV", "NULLS", "COMPLETENESS"}
+		var rows [][]string
+		for _, fs := range stats.FeatureDescriptiveStatistics {
+			rows = append(rows, []string{
+				fs.FeatureName,
+				fs.FeatureType,
+				fmtInt64(fs.Count),
+				fmtFloat64(fs.Mean),
+				fmtFloat64(fs.Min),
+				fmtFloat64(fs.Max),
+				fmtFloat64(fs.Stddev),
+				fmtInt64(fs.NumNullValues),
+				fmtFloat32Pct(fs.Completeness),
+			})
+		}
+		output.Table(headers, rows)
+		return nil
+	},
+}
+
 var fgDeleteCmd = &cobra.Command{
 	Use:   "delete <name>",
 	Short: "Delete a feature group",
@@ -332,6 +429,9 @@ func init() {
 	fgCreateCmd.Flags().StringVar(&fgCreateDesc, "description", "", "Description")
 	fgCreateCmd.Flags().StringVar(&fgCreateFormat, "format", "", "Time travel format: HUDI or DELTA (default: server decides)")
 	fgDeleteCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version to delete")
+	fgStatsCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version")
+	fgStatsCmd.Flags().StringVar(&fgStatsFeatures, "features", "", "Filter to specific features (comma-separated)")
+	fgStatsCmd.Flags().BoolVar(&fgStatsCompute, "compute", false, "Trigger statistics computation (Spark job)")
 
 	fgCmd.AddCommand(fgListCmd)
 	fgCmd.AddCommand(fgInfoCmd)
@@ -339,6 +439,7 @@ func init() {
 	fgCmd.AddCommand(fgFeaturesCmd)
 	fgCmd.AddCommand(fgCreateCmd)
 	fgCmd.AddCommand(fgDeleteCmd)
+	fgCmd.AddCommand(fgStatsCmd)
 }
 
 // Helper: create client with project validation
@@ -409,4 +510,25 @@ func trimSpace(s string) string {
 		s = s[:len(s)-1]
 	}
 	return s
+}
+
+func fmtFloat64(v *float64) string {
+	if v == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.4g", *v)
+}
+
+func fmtFloat32Pct(v *float32) string {
+	if v == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.1f%%", *v*100)
+}
+
+func fmtInt64(v *int64) string {
+	if v == nil {
+		return "-"
+	}
+	return strconv.FormatInt(*v, 10)
 }
