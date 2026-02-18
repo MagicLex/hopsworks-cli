@@ -8,6 +8,8 @@ Status: in progress
 - **Transformations:** list, create (file + inline @udf)
 - **TD:** list, create, compute (materialize with splits), read (retrieve with splits), delete
 - **Job:** list, status (with --wait polling)
+- **Model:** list, info, delete, register (Python SDK), download (Python SDK)
+- **Deployment:** list, info, create (REST), start, stop, delete, predict, logs
 - **Other:** update (self-update from GitHub releases), --version, init (Claude Code integration)
 
 ---
@@ -85,6 +87,19 @@ Status: in progress
 - [x] `cmd/fg.go` — `fg info` displays embedding index (column, dimension, metric)
 - [x] `cmd/fg_search.go` — `hops fg search <name> --vector "..." --k N` via Python SDK `find_neighbors()`
 - [x] End-to-end tested: create with embedding, insert vectors, KNN search (cosine), JSON mode
+
+## Phase 7: Model Registry & Serving — DONE
+> Full ML lifecycle: register models, deploy, predict, manage.
+
+- [x] `pkg/client/model.go` — Model DTOs + list/get/delete methods
+- [x] `cmd/model.go` — `hops model list`, `info <name> [--version]`, `delete <name> --version`
+- [x] `cmd/model_register.go` — `hops model register <name> <path> --framework --metrics --description`
+- [x] `cmd/model_register.go` — `hops model download <name> [--version] [--output dir]`
+- [x] `pkg/client/deployment.go` — Deployment DTOs + list/get/create/delete/action/logs/predict
+- [x] `cmd/deployment.go` — `hops deployment list/info/create/start/stop/delete/predict/logs`
+- [x] Deployment create via Go REST (SDK `model.deploy()` is broken for PYTHON framework)
+- [x] Fixed `get_best_model` → `get_models` fallback (SDK requires metric+direction args)
+- [x] End-to-end tested: model list/info, deployment create/start/info (all working)
 
 ---
 

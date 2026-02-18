@@ -72,6 +72,21 @@ hops transformation create --file my_scaler.py
 # Browse files
 hops dataset list
 
+# Model Registry
+hops model list
+hops model info fraud_detector --version 1
+hops model register fraud_detector ./model_dir --framework sklearn --metrics "accuracy=0.95"
+hops model download fraud_detector --output ./local_dir
+
+# Deployments (serving)
+hops deployment list
+hops deployment create fraud_detector --version 1 --script predictor.py
+hops deployment start testmodel
+hops deployment predict testmodel --data '{"instances": [[1, 2, 3]]}'
+hops deployment logs testmodel --tail 100
+hops deployment stop testmodel
+hops deployment delete testmodel
+
 # Context dump (for LLMs)
 hops context
 ```
@@ -87,6 +102,8 @@ hops context
 | `hops fv list\|info\|create\|get\|read\|delete` | Feature views (joins + transforms + online/batch read) |
 | `hops transformation list\|create` | Transformation functions |
 | `hops td list\|create\|compute\|read\|delete` | Training datasets (materialize + retrieve with splits) |
+| `hops model list\|info\|register\|download\|delete` | Model registry |
+| `hops deployment list\|info\|create\|start\|stop\|predict\|logs\|delete` | Model deployments (serving) |
 | `hops job list\|status` | Jobs (with `--wait` polling) |
 | `hops dataset list\|mkdir` | Browse project files |
 | `hops init` | Set up Claude Code integration |
