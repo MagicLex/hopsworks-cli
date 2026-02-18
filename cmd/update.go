@@ -6,9 +6,8 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
+	"runtime"
 	"time"
 
 	"github.com/MagicLex/hopsworks-cli/pkg/output"
@@ -19,11 +18,10 @@ const githubRepo = "MagicLex/hopsworks-cli"
 
 var updateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update hops to the latest version",
+	Short: "Check for updates and improvements",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		output.Info("Current version: %s", Version)
 
-		// Check latest version from GitHub
 		latest, err := getLatestVersion()
 		if err != nil {
 			return fmt.Errorf("check latest version: %w", err)
@@ -36,61 +34,49 @@ var updateCmd = &cobra.Command{
 
 		output.Info("Latest version: %s", latest)
 
-		// Find where hops is installed
 		currentBin, err := os.Executable()
 		if err != nil {
 			return fmt.Errorf("find current binary: %w", err)
 		}
 		currentBin, _ = filepath.EvalSymlinks(currentBin)
 
-		// Build from source via go install
-		if _, err := exec.LookPath("go"); err != nil {
-			return fmt.Errorf("go not found in PATH — install Go or update manually")
-		}
+		// Download pre-built binary from GitHub release
+		assetName := fmt.Sprintf("hops-%s-%s", runtime.GOOS, runtime.GOARCH)
+		downloadURL := fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", githubRepo, latest, assetName)
 
-		output.Info("Building latest from source...")
+		output.Info("Downloading %s...", downloadURL)
 
-		tmpDir, err := os.MkdirTemp("", "hops-update-*")
+		tmpFile, err := os.CreateTemp("", "hops-update-*")
 		if err != nil {
-			return fmt.Errorf("create temp dir: %w", err)
+			return fmt.Errorf("create temp file: %w", err)
 		}
-		defer os.RemoveAll(tmpDir)
+		tmpPath := tmpFile.Name()
+		defer os.Remove(tmpPath)
 
-		goInstall := exec.Command("go", "install",
-			"-ldflags", fmt.Sprintf("-X github.com/%s/cmd.Version=%s", githubRepo, strings.TrimPrefix(latest, "v")),
-			fmt.Sprintf("github.com/%s@%s", githubRepo, latest),
-		)
-		goInstall.Stdout = os.Stdout
-		goInstall.Stderr = os.Stderr
-		if err := goInstall.Run(); err != nil {
-			return fmt.Errorf("go install failed: %w", err)
+		client := &http.Client{Timeout: 60 * time.Second}
+		resp, err := client.Get(downloadURL)
+		if err != nil {
+			return fmt.Errorf("download failed: %w", err)
 		}
+		defer resp.Body.Close()
 
-		// Find the built binary in GOPATH/bin
-		gopath := os.Getenv("GOPATH")
-		if gopath == "" {
-			home, _ := os.UserHomeDir()
-			gopath = filepath.Join(home, "go")
-		}
-		builtBin := filepath.Join(gopath, "bin", "hopsworks-cli")
-
-		if _, err := os.Stat(builtBin); err != nil {
-			return fmt.Errorf("built binary not found at %s", builtBin)
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("download failed: HTTP %d (asset %s may not exist for this platform)", resp.StatusCode, assetName)
 		}
 
-		// Copy to current location
-		if err := copyFile(builtBin, currentBin); err != nil {
-			// Try the go/bin rename as fallback (same filesystem)
-			target := filepath.Join(filepath.Dir(builtBin), "hops")
-			if err2 := os.Rename(builtBin, target); err2 != nil {
-				return fmt.Errorf("install failed: %w (also tried rename: %v)", err, err2)
-			}
-			output.Success("Updated to %s at %s", latest, target)
-			return nil
+		if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+			tmpFile.Close()
+			return fmt.Errorf("download failed: %w", err)
+		}
+		tmpFile.Close()
+
+		if err := os.Chmod(tmpPath, 0755); err != nil {
+			return fmt.Errorf("chmod failed: %w", err)
 		}
 
-		// Clean up the hopsworks-cli name in go/bin
-		os.Remove(builtBin)
+		if err := copyFile(tmpPath, currentBin); err != nil {
+			return fmt.Errorf("replace binary failed: %w (try: curl -L %s -o %s)", err, downloadURL, currentBin)
+		}
 
 		output.Success("Updated to %s", latest)
 		return nil
@@ -100,7 +86,6 @@ var updateCmd = &cobra.Command{
 func getLatestVersion() (string, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	// Try releases first
 	resp, err := client.Get(fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", githubRepo))
 	if err != nil {
 		return "", err
@@ -116,7 +101,6 @@ func getLatestVersion() (string, error) {
 		}
 	}
 
-	// Fallback: latest tag
 	resp2, err := client.Get(fmt.Sprintf("https://api.github.com/repos/%s/tags?per_page=1", githubRepo))
 	if err != nil {
 		return "", err
