@@ -15,18 +15,31 @@ type Feature struct {
 	Partition   bool   `json:"partition,omitempty"`
 }
 
+type EmbeddingFeature struct {
+	Name                   string `json:"name"`
+	Dimension              int    `json:"dimension"`
+	SimilarityFunctionType string `json:"similarityFunctionType"`
+}
+
+type EmbeddingIndex struct {
+	IndexName *string            `json:"indexName"`
+	Features  []EmbeddingFeature `json:"features"`
+	ColPrefix *string            `json:"colPrefix"`
+}
+
 type FeatureGroup struct {
-	ID            int       `json:"id"`
-	Name          string    `json:"name"`
-	Version       int       `json:"version"`
-	Description   string    `json:"description,omitempty"`
-	Created       string    `json:"created,omitempty"`
-	OnlineEnabled bool      `json:"onlineEnabled"`
-	TimeTravelFormat string `json:"timeTravelFormat,omitempty"`
-	Features      []Feature `json:"features,omitempty"`
-	EventTime     string    `json:"eventTime,omitempty"`
-	NumRows       *int64    `json:"numRows,omitempty"`
-	Location      string    `json:"location,omitempty"`
+	ID               int             `json:"id"`
+	Name             string          `json:"name"`
+	Version          int             `json:"version"`
+	Description      string          `json:"description,omitempty"`
+	Created          string          `json:"created,omitempty"`
+	OnlineEnabled    bool            `json:"onlineEnabled"`
+	TimeTravelFormat string          `json:"timeTravelFormat,omitempty"`
+	Features         []Feature       `json:"features,omitempty"`
+	EventTime        string          `json:"eventTime,omitempty"`
+	NumRows          *int64          `json:"numRows,omitempty"`
+	Location         string          `json:"location,omitempty"`
+	EmbeddingIndex   *EmbeddingIndex `json:"embeddingIndex,omitempty"`
 }
 
 type FeatureGroupList struct {
@@ -140,15 +153,16 @@ func (c *Client) PreviewFeatureGroup(fgID int, n int) ([]map[string]interface{},
 }
 
 type CreateFeatureGroupRequest struct {
-	Name             string    `json:"name"`
-	Version          int       `json:"version"`
-	Description      string    `json:"description,omitempty"`
-	OnlineEnabled    bool      `json:"onlineEnabled"`
-	EventTime        string    `json:"eventTime,omitempty"`
-	Features         []Feature `json:"features"`
-	TimeTravelFormat string    `json:"timeTravelFormat,omitempty"`
-	Type             string    `json:"type"`
-	FeatureStoreID   int       `json:"featurestoreId"`
+	Name             string          `json:"name"`
+	Version          int             `json:"version"`
+	Description      string          `json:"description,omitempty"`
+	OnlineEnabled    bool            `json:"onlineEnabled"`
+	EventTime        string          `json:"eventTime,omitempty"`
+	Features         []Feature       `json:"features"`
+	TimeTravelFormat string          `json:"timeTravelFormat,omitempty"`
+	Type             string          `json:"type"`
+	FeatureStoreID   int             `json:"featurestoreId"`
+	EmbeddingIndex   *EmbeddingIndex `json:"embeddingIndex,omitempty"`
 }
 
 func (c *Client) CreateFeatureGroup(req *CreateFeatureGroupRequest) (*FeatureGroup, error) {

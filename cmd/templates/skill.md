@@ -38,6 +38,7 @@ hops fg info <name> [--version N]         # Show details + schema
 hops fg preview <name> [--n 10]           # Preview data rows
 hops fg features <name>                   # List features with types
 hops fg stats <name> [--version N]        # Show/compute statistics
+hops fg search <name> --vector "0.1,..."  # KNN similarity search
 hops fg delete <name> --version N         # Delete
 ```
 
@@ -47,15 +48,35 @@ hops fg create <name> --primary-key <cols> [flags]
 ```
 Flags:
 - `--primary-key <cols>` — comma-separated primary key columns (required)
-- `--features "name:type,..."` — schema spec (types: bigint, double, boolean, timestamp, string)
+- `--features "name:type,..."` — schema spec (types: bigint, double, boolean, timestamp, string, array<float>)
 - `--online` — enable online storage (creates stream FG with Kafka + materialization job)
 - `--event-time <col>` — event time column for time-travel queries
 - `--description <text>` — feature group description
 - `--format <DELTA|NONE>` — time travel format (default: DELTA)
 - `--version <n>` — version number (default: 1)
+- `--embedding "name:dimension[:metric]"` — embedding column (repeatable, metrics: l2, cosine, dot_product)
 
 Without `--online`: creates offline-only (cached) FG — direct Delta writes, no Kafka.
 With `--online`: creates online+offline (stream) FG — writes go to Kafka→RonDB, then a Spark job materializes to Delta (~2min).
+With `--embedding`: auto-enables online, creates OpenSearch vector index for similarity search.
+
+#### Embeddings & Similarity Search
+```bash
+# Create FG with embedding column
+hops fg create documents \
+  --primary-key doc_id \
+  --features "doc_id:bigint,title:string" \
+  --embedding "text_embedding:384:cosine"
+
+# Search for nearest neighbors
+hops fg search documents --vector "0.1,0.2,..." --k 5
+hops fg search documents --vector "[0.1, 0.2, ...]" --k 10 --col text_embedding
+```
+Flags for search:
+- `--vector` — query vector (comma-separated floats or JSON array, required)
+- `--k <n>` — number of neighbors (default: 10)
+- `--col <name>` — embedding column (required if FG has multiple embeddings)
+- `--version <n>` — feature group version
 
 #### Insert
 ```bash

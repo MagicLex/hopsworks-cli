@@ -101,6 +101,17 @@ var fgInfoCmd = &cobra.Command{
 			}
 			output.Table(headers, rows)
 		}
+
+		if fg.EmbeddingIndex != nil && len(fg.EmbeddingIndex.Features) > 0 {
+			output.Info("")
+			output.Info("Embeddings:")
+			headers := []string{"COLUMN", "DIMENSION", "METRIC"}
+			var rows [][]string
+			for _, ef := range fg.EmbeddingIndex.Features {
+				rows = append(rows, []string{ef.Name, strconv.Itoa(ef.Dimension), ef.SimilarityFunctionType})
+			}
+			output.Table(headers, rows)
+		}
 		return nil
 	},
 }
@@ -195,12 +206,13 @@ var fgFeaturesCmd = &cobra.Command{
 }
 
 var (
-	fgCreatePK       string
-	fgCreateOnline   bool
-	fgCreateEvtTime  string
-	fgCreateDesc     string
-	fgCreateFeatures string
-	fgCreateFormat   string
+	fgCreatePK         string
+	fgCreateOnline     bool
+	fgCreateEvtTime    string
+	fgCreateDesc       string
+	fgCreateFeatures   string
+	fgCreateFormat     string
+	fgCreateEmbeddings []string
 )
 
 var fgCreateCmd = &cobra.Command{
@@ -218,7 +230,13 @@ Examples:
     --features "customer_id:bigint,age:bigint,total_spent:double,is_premium:boolean,event_time:timestamp" \
     --event-time event_time \
     --online \
-    --description "Customer transaction features"`,
+    --description "Customer transaction features"
+
+  # With embeddings (auto-enables online store)
+  hops fg create documents \
+    --primary-key doc_id \
+    --features "doc_id:bigint,title:string" \
+    --embedding "text_embedding:384:cosine"`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if fgVersion == 0 {
@@ -266,6 +284,29 @@ Examples:
 			}
 		}
 
+		// Parse embeddings
+		var embeddingIndex *client.EmbeddingIndex
+		if len(fgCreateEmbeddings) > 0 {
+			embFeatures, embSchemaFeatures, err := parseEmbeddingSpecs(fgCreateEmbeddings)
+			if err != nil {
+				return err
+			}
+
+			// Merge embedding columns into feature list (skip if already declared)
+			existing := make(map[string]bool)
+			for _, f := range features {
+				existing[f.Name] = true
+			}
+			for _, ef := range embSchemaFeatures {
+				if !existing[ef.Name] {
+					features = append(features, ef)
+				}
+			}
+
+			embeddingIndex = &client.EmbeddingIndex{Features: embFeatures}
+			fgCreateOnline = true // embeddings require online store
+		}
+
 		req := &client.CreateFeatureGroupRequest{
 			Name:             args[0],
 			Version:          fgVersion,
@@ -274,6 +315,7 @@ Examples:
 			Description:      fgCreateDesc,
 			Features:         features,
 			TimeTravelFormat: fgCreateFormat,
+			EmbeddingIndex:   embeddingIndex,
 		}
 
 		fg, err := c.CreateFeatureGroup(req)
@@ -413,6 +455,51 @@ var fgDeleteCmd = &cobra.Command{
 	},
 }
 
+// parseEmbeddingSpecs parses --embedding flags into EmbeddingFeatures + schema Features.
+// Format: "col_name:dimension[:metric]" where metric is l2, cosine, or dot_product.
+func parseEmbeddingSpecs(specs []string) ([]client.EmbeddingFeature, []client.Feature, error) {
+	var embFeatures []client.EmbeddingFeature
+	var schemaFeatures []client.Feature
+
+	for _, spec := range specs {
+		parts := splitStr(trimSpace(spec), ":")
+		if len(parts) < 2 || len(parts) > 3 {
+			return nil, nil, fmt.Errorf("invalid --embedding %q: expected \"name:dimension[:metric]\"", spec)
+		}
+
+		name := trimSpace(parts[0])
+		dim := 0
+		if _, err := fmt.Sscanf(trimSpace(parts[1]), "%d", &dim); err != nil || dim <= 0 {
+			return nil, nil, fmt.Errorf("invalid dimension in --embedding %q: must be positive integer", spec)
+		}
+
+		metric := "l2_norm"
+		if len(parts) == 3 {
+			switch trimSpace(parts[2]) {
+			case "l2", "l2_norm":
+				metric = "l2_norm"
+			case "cosine":
+				metric = "cosine"
+			case "dot_product":
+				metric = "dot_product"
+			default:
+				return nil, nil, fmt.Errorf("invalid metric in --embedding %q: must be l2, cosine, or dot_product", spec)
+			}
+		}
+
+		embFeatures = append(embFeatures, client.EmbeddingFeature{
+			Name:                   name,
+			Dimension:              dim,
+			SimilarityFunctionType: metric,
+		})
+		schemaFeatures = append(schemaFeatures, client.Feature{
+			Name: name,
+			Type: "array<float>",
+		})
+	}
+	return embFeatures, schemaFeatures, nil
+}
+
 func init() {
 	rootCmd.AddCommand(fgCmd)
 
@@ -428,6 +515,7 @@ func init() {
 	fgCreateCmd.Flags().StringVar(&fgCreateEvtTime, "event-time", "", "Event time column")
 	fgCreateCmd.Flags().StringVar(&fgCreateDesc, "description", "", "Description")
 	fgCreateCmd.Flags().StringVar(&fgCreateFormat, "format", "DELTA", "Time travel format: DELTA or NONE")
+	fgCreateCmd.Flags().StringArrayVar(&fgCreateEmbeddings, "embedding", nil, `Embedding column: "name:dimension[:metric]" (l2, cosine, dot_product)`)
 	fgDeleteCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version to delete")
 	fgStatsCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version")
 	fgStatsCmd.Flags().StringVar(&fgStatsFeatures, "features", "", "Filter to specific features (comma-separated)")

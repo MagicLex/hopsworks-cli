@@ -3,7 +3,7 @@
 Status: in progress
 
 ## What exists
-- **FG:** list, info, preview, features, create, delete, insert (Python SDK), stats, derive (join + provenance)
+- **FG:** list, info, preview, features, create (with embeddings), delete, insert (Python SDK), stats, search (KNN), derive (join + provenance)
 - **FV:** list, info (shows source FGs + joins), create (multi-FG joins + transforms), get (online vectors), read (batch offline), delete
 - **Transformations:** list, create (file + inline @udf)
 - **TD:** list, create, compute (materialize with splits), read (retrieve with splits), delete
@@ -76,6 +76,15 @@ Status: in progress
 - [x] `cmd/td.go` — `hops td read <fv> <ver> --td-version N [--split train] [--output file]` (retrieve TD)
 - [x] Shared helpers: `buildFVPreamble()`, `runPython()`, `pythonLiteral()` in `fv_read.go`
 - [x] End-to-end tested: fv get (online), fv read (batch+file+json), td compute (no-split + split), td read (full+split+file)
+
+## Phase 6: Embeddings & Similarity Search — DONE
+> Vector embeddings in feature groups + KNN similarity search.
+
+- [x] `pkg/client/featuregroup.go` — `EmbeddingFeature`, `EmbeddingIndex` structs in request + response
+- [x] `cmd/fg.go` — `--embedding "name:dim[:metric]"` flag on `fg create`, auto-adds `array<float>` feature, auto-enables online
+- [x] `cmd/fg.go` — `fg info` displays embedding index (column, dimension, metric)
+- [x] `cmd/fg_search.go` — `hops fg search <name> --vector "..." --k N` via Python SDK `find_neighbors()`
+- [x] End-to-end tested: create with embedding, insert vectors, KNN search (cosine), JSON mode
 
 ---
 
