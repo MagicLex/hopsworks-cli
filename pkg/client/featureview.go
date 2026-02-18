@@ -78,6 +78,12 @@ func (c *Client) GetFeatureView(name string, version int) (*FeatureView, error) 
 	return &fv, nil
 }
 
+// FVTransformSpec maps a transformation function to a feature column.
+type FVTransformSpec struct {
+	TF     *TransformationFunction
+	Column string // target feature column name
+}
+
 // FVJoinSpec describes a join for feature view creation.
 type FVJoinSpec struct {
 	FG      *FeatureGroup
@@ -87,7 +93,7 @@ type FVJoinSpec struct {
 	Prefix  string   // optional prefix for right FG features
 }
 
-func (c *Client) CreateFeatureView(name string, version int, description string, baseFG *FeatureGroup, features []string, labels []string, joins []FVJoinSpec) (*FeatureView, error) {
+func (c *Client) CreateFeatureView(name string, version int, description string, baseFG *FeatureGroup, features []string, labels []string, joins []FVJoinSpec, transforms []FVTransformSpec) (*FeatureView, error) {
 	req := map[string]interface{}{
 		"name":           name,
 		"version":        version,
@@ -161,6 +167,36 @@ func (c *Client) CreateFeatureView(name string, version int, description string,
 			labelList = append(labelList, map[string]string{"name": l})
 		}
 		req["label"] = labelList
+	}
+
+	if len(transforms) > 0 {
+		var tfList []map[string]interface{}
+		for _, t := range transforms {
+			// Clone the UDF but set transformationFeatures to the target column
+			udf := map[string]interface{}{
+				"sourceCode":                          t.TF.HopsworksUdf.SourceCode,
+				"name":                                t.TF.HopsworksUdf.Name,
+				"outputTypes":                         t.TF.HopsworksUdf.OutputTypes,
+				"transformationFeatures":              []string{t.Column},
+				"transformationFunctionArgumentNames": t.TF.HopsworksUdf.TransformationFunctionArgumentNames,
+				"executionMode":                       t.TF.HopsworksUdf.ExecutionMode,
+			}
+			if t.TF.HopsworksUdf.DroppedArgumentNames != nil {
+				udf["droppedArgumentNames"] = t.TF.HopsworksUdf.DroppedArgumentNames
+			}
+			if t.TF.HopsworksUdf.StatisticsArgumentNames != nil {
+				udf["statisticsArgumentNames"] = t.TF.HopsworksUdf.StatisticsArgumentNames
+			}
+
+			tfEntry := map[string]interface{}{
+				"id":             t.TF.ID,
+				"version":        t.TF.Version,
+				"featurestoreId": c.Config.FeatureStoreID,
+				"hopsworksUdf":   udf,
+			}
+			tfList = append(tfList, tfEntry)
+		}
+		req["transformationFunctions"] = tfList
 	}
 
 	body, err := json.Marshal(req)

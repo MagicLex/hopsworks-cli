@@ -58,7 +58,8 @@ hops context
 | `hops project list\|use\|info` | Manage projects |
 | `hops fs list` | List feature stores |
 | `hops fg list\|info\|preview\|features\|create\|delete\|insert\|derive` | Feature groups |
-| `hops fv list\|info\|create\|delete` | Feature views |
+| `hops fv list\|info\|create\|delete` | Feature views (joins + transforms) |
+| `hops transformation list\|create` | Transformation functions |
 | `hops td list\|create\|delete` | Training datasets |
 | `hops job list` | List jobs |
 | `hops dataset list\|mkdir` | Browse project files |

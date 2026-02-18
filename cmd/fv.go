@@ -116,12 +116,13 @@ var fvInfoCmd = &cobra.Command{
 }
 
 var (
-	fvCreateFG       string
-	fvCreateFGVer    int
-	fvCreateFeatures string
-	fvCreateLabels   string
-	fvCreateDesc     string
-	fvCreateJoins    []string
+	fvCreateFG         string
+	fvCreateFGVer      int
+	fvCreateFeatures   string
+	fvCreateLabels     string
+	fvCreateDesc       string
+	fvCreateJoins      []string
+	fvCreateTransforms []string
 )
 
 var fvCreateCmd = &cobra.Command{
@@ -207,7 +208,28 @@ Join spec: "<fg>[:<version>] <INNER|LEFT|RIGHT|FULL> <on>[=<right_on>] [prefix]"
 			labels = splitComma(fvCreateLabels)
 		}
 
-		fv, err := c.CreateFeatureView(args[0], fvVersion, fvCreateDesc, baseFG, features, labels, joins)
+		// Parse transforms: "fn_name:column"
+		var transforms []client.FVTransformSpec
+		for _, raw := range fvCreateTransforms {
+			parts := strings.SplitN(raw, ":", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid transform spec %q (expected \"fn_name:column\")", raw)
+			}
+			tfName := strings.TrimSpace(parts[0])
+			colName := strings.TrimSpace(parts[1])
+
+			tf, err := c.GetTransformationFunction(tfName, 0)
+			if err != nil {
+				return fmt.Errorf("transformation '%s' not found: %w", tfName, err)
+			}
+
+			transforms = append(transforms, client.FVTransformSpec{
+				TF:     tf,
+				Column: colName,
+			})
+		}
+
+		fv, err := c.CreateFeatureView(args[0], fvVersion, fvCreateDesc, baseFG, features, labels, joins, transforms)
 		if err != nil {
 			return err
 		}
@@ -255,6 +277,7 @@ func init() {
 	fvCreateCmd.Flags().StringVar(&fvCreateLabels, "labels", "", "Label columns (comma-separated)")
 	fvCreateCmd.Flags().StringVar(&fvCreateDesc, "description", "", "Description")
 	fvCreateCmd.Flags().StringArrayVar(&fvCreateJoins, "join", nil, `Join spec: "<fg>[:<ver>] <INNER|LEFT|RIGHT|FULL> <on>[=<right_on>] [prefix]"`)
+	fvCreateCmd.Flags().StringArrayVar(&fvCreateTransforms, "transform", nil, `Transform spec: "fn_name:column"`)
 	fvDeleteCmd.Flags().IntVar(&fvVersion, "version", 0, "Version to delete (all if omitted)")
 
 	fvCmd.AddCommand(fvListCmd)

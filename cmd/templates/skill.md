@@ -131,6 +131,19 @@ Flags:
 - `--description <text>` — description
 - `--version <n>` — version (default: 1)
 - `--fg-version <n>` — base FG version (latest if omitted)
+- `--transform <spec>` — transform spec (repeatable): `"fn_name:column"`
+
+### Transformations
+```bash
+hops transformation list                         # List all transformation functions
+hops transformation create --file scaler.py      # Register from Python file
+hops transformation create --code '@udf(float)   # Register inline
+def double_it(value):
+    return value * 2'
+```
+Alias: `hops tf list`, `hops tf create`
+
+Custom transforms are saved locally to `~/.hops/transformations/`.
 
 ### Training Datasets
 ```bash

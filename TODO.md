@@ -4,7 +4,8 @@ Status: in progress
 
 ## What exists
 - **FG:** list, info, preview, features, create, delete, insert (Python SDK), stats, derive (join + provenance)
-- **FV:** list, info (shows source FGs + joins), create (single FG or multi-FG with joins), delete
+- **FV:** list, info (shows source FGs + joins), create (multi-FG joins + transforms), delete
+- **Transformations:** list, create (file + inline @udf)
 - **TD:** list, create, delete
 - **Job:** list, status (with --wait polling)
 - **Other:** update (self-update from GitHub releases), --version, init (Claude Code integration)
@@ -55,13 +56,16 @@ Status: in progress
 - [x] `GetFeatureViewQuery` client method parses query response
 - [x] End-to-end tested: single FG create, joined FV create, info display (all working)
 
-## Phase 4: Transformations (list + reference only)
-> List existing, reference in FV. No Python UDF creation from Go.
+## Phase 4: Transformations — DONE
+> List, create custom, attach to feature views.
 
-- [ ] `pkg/client/transformation.go` — TF DTOs + list
-- [ ] `cmd/transformation.go` — `hops transformation list`
-- [ ] `cmd/fv.go` — `--transformation "fn_name:feature"` flag
-- [ ] Test against live cluster
+- [x] `pkg/client/transformation.go` — DTOs + list/get/create methods
+- [x] `cmd/transformation.go` — `hops transformation list` + `create --file/--code`
+- [x] Custom UDF parsing via Python AST (extracts name, args, return types)
+- [x] Local save: custom transforms saved to `~/.hops/transformations/`
+- [x] `cmd/fv.go` — `--transform "fn_name:column"` (repeatable), resolves TF by name
+- [x] `pkg/client/featureview.go` — FVTransformSpec, serializes transformationFunctions array
+- [x] End-to-end tested: list built-ins, create custom (file + inline), attach to FV
 
 ## Phase 5: FV Query/Preview
 > Inspect what a feature view actually produces.
