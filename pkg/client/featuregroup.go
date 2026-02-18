@@ -114,16 +114,13 @@ func (c *Client) PreviewFeatureGroup(fgID int, n int) ([]map[string]interface{},
 		return nil, err
 	}
 
-	// The preview endpoint returns items with rows
+	// The preview endpoint returns: { items: [{ row: [{columnName, columnValue}, ...], storage: "OFFLINE" }, ...] }
 	var result struct {
 		Items []struct {
-			Type string `json:"type"`
-			Rows []struct {
-				Values []struct {
-					ColumnName string      `json:"columnName"`
-					Value      interface{} `json:"columnValue"`
-				} `json:"values"`
-			} `json:"rows"`
+			Row []struct {
+				ColumnName string      `json:"columnName"`
+				Value      interface{} `json:"columnValue"`
+			} `json:"row"`
 		} `json:"items"`
 	}
 
@@ -133,13 +130,11 @@ func (c *Client) PreviewFeatureGroup(fgID int, n int) ([]map[string]interface{},
 
 	var rows []map[string]interface{}
 	for _, item := range result.Items {
-		for _, row := range item.Rows {
-			r := make(map[string]interface{})
-			for _, v := range row.Values {
-				r[v.ColumnName] = v.Value
-			}
-			rows = append(rows, r)
+		r := make(map[string]interface{})
+		for _, col := range item.Row {
+			r[col.ColumnName] = col.Value
 		}
+		rows = append(rows, r)
 	}
 	return rows, nil
 }

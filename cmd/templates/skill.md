@@ -58,10 +58,17 @@ hops td create <fv-name> <fv-version>     # Create training dataset
 hops td delete <fv-name> <fv-version> <td-version>  # Delete
 ```
 
+### Jobs
+```bash
+hops job list                             # List jobs
+hops job status <name>                    # Latest execution status
+hops job status <name> --wait             # Poll until finished (10s default)
+hops job status <name> --wait --poll 5    # Poll every 5s
+```
+
 ### Other
 ```bash
 hops fs list                              # List feature stores
-hops job list                             # List jobs
 hops dataset list [path]                  # Browse project files
 hops dataset mkdir <path>                 # Create directory
 hops context                              # Dump full schema (for LLM context)

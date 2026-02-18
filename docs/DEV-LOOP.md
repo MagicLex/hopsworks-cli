@@ -69,6 +69,8 @@ chmod +x ~/hops
 # No config needed — JWT + project auto-discovered
 ~/hops fg list
 ~/hops fg insert customer_transactions --generate 50   # needs Python SDK (available here)
+~/hops job status customer_transactions_1_offline_fg_materialization --wait  # poll until done
+~/hops fg preview customer_transactions                 # verify data landed
 ~/hops fg stats customer_transactions --compute         # triggers Spark job
 ~/hops fg stats customer_transactions                   # view results
 ```

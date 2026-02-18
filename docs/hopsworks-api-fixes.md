@@ -50,11 +50,13 @@ else:
 
 **Status**: Committed on `fix/cli-terminal`. Needs PR to upstream.
 
-## Installation blocker
+## Installation status
 
-The system-installed `hsfs` at `/usr/local/lib/python3.11/dist-packages/hsfs/` is root-owned. The fork's `hsfs` (from `main`) depends on a newer `hopsworks_common` with `SinkJobConfiguration` that doesn't exist in the installed version. So we can't just `pip install --user -e` the fork.
+System `hsfs` is root-owned. Fork's `main` depends on newer `hopsworks_common` (SinkJobConfiguration) — can't `pip install -e`.
 
-**Options**:
-1. Rebuild terminal image with patched SDK (proper fix)
-2. `PYTHONPATH` override with just the patched files (fragile)
-3. Wait for upstream to merge fixes and release 4.8.x
+**Applied via user site-packages overlay** (see `docs/SDK-FIXES.md` for full details):
+- Copied system `hsfs` to `~/.local/lib/python3.11/site-packages/hsfs/`
+- Applied Fix 1 (feature_group.py) as a patch to the installed version copy
+- Applied Fix 2 (delta_engine.py) by copying the fork's file (installed == upstream/main)
+
+**Proper fix (later)**: rebuild terminal image with patched SDK, or upstream PR + new release.

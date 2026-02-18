@@ -33,18 +33,13 @@ envVars.add(new V1EnvVar().name("PEMS_DIR").value("/srv/hops/pems"));
 
 **Alternative**: Mount PEM certs directly as a separate Secret/ConfigMap alongside the JKS ones. The CA, client cert, and client key are already known at pod creation time.
 
-## Fix 2: HDFS write permissions for project users
+## Fix 2: HDFS write permissions for project users — LOW PRIORITY
 
-**Problem**: After fixing TLS, writes to `/apps/hive/warehouse/<project>_featurestore.db/` fail with `Failed to create file`. The HDFS user `lexterm__meb10000` likely doesn't have write ACLs on the warehouse directory.
+**Original problem**: After fixing TLS, writes to `/apps/hive/warehouse/<project>_featurestore.db/` fail with `Failed to create file`.
 
-**Impact**: Delta table initialization (first insert) fails. This blocks all offline feature group writes from terminal pods.
+**Current status**: Not a blocker for online-enabled FGs. The terminal writes to Kafka (online store), then a Spark materialization job handles the Delta/HDFS write with proper permissions. The early "Failed to create file" error was from the cert debugging phase.
 
-**Where to investigate**:
-- Check HDFS ACLs: `hdfs dfs -getfacl /apps/hive/warehouse/lexterm_featurestore.db/`
-- The Hive warehouse dirs are typically owned by `hive` or `glassfish` — project users may need explicit ACLs
-- Compare with what Spark jobs get (they run as `lexterm__meb10000` too but via YARN which may have different permissions)
-
-**Possible fix in KubeTerminalManager**: Ensure the terminal pod's HDFS user has the same write permissions as Spark executors for the project's warehouse directory.
+**Still relevant for**: Offline-only FGs (no online store) where the Python engine writes directly to Delta via libhdfs. Not currently tested or needed.
 
 ## Fix 3: Set LIBHDFS_DEFAULT_USER env var
 

@@ -6,27 +6,22 @@ Status: in progress
 - **FG:** list, info, preview, features, create, delete, insert (Python SDK), stats
 - **FV:** list, info, create (single FG only), delete
 - **TD:** list, create, delete
+- **Job:** list, status (with --wait polling)
 - **Other:** update (self-update from GitHub releases), --version, init (Claude Code integration)
 
 ---
 
-## Phase 1: Statistics — DONE
+## Phase 1: Statistics + Insert Pipeline — DONE
 - [x] `pkg/client/statistics.go` — DTOs + client methods
 - [x] `cmd/fg.go` — `hops fg stats <name> [--version N] [--features col1,col2]`
 - [x] `cmd/fg.go` — `hops fg stats <name> --compute` (trigger Spark job)
-- [x] Tested against live cluster (endpoint works, no data yet to show real stats)
-
-## Blocker: Insert data to test stats end-to-end
-- [x] Build hops from source (v0.2.0 installed at ~/hops-bin)
 - [x] FG recreated as DELTA (was HUDI, incompatible with 4.8 backend)
-- [x] JKS certs extracted to PEM at ~/.hopsfs_pems/ (client_key.pem, client_cert.pem, ca_chain.pem)
-- [x] TLS connection to NameNode working with PEMS_DIR env var
-- [ ] Fix HDFS write permissions (user lexterm__meb10000 can't write to /apps/hive/warehouse/)
-- [ ] Fix SDK bugs upstream (see docs/SDK-FIXES.md):
-  - commit_details IndexError on first insert (fixed in fork, not installed)
-  - delta_engine skips PEMS_DIR for internal clients (fixed in fork, not installed)
-- [ ] Install patched SDK (system hsfs is root-owned — need terminal image rebuild or PYTHONPATH override)
-- [ ] End-to-end test: insert → preview → stats
+- [x] JKS certs extracted to PEM at ~/.hopsfs_pems/
+- [x] SDK patches applied via user site-packages overlay (see docs/SDK-FIXES.md)
+- [x] CLI sets PEMS_DIR + LIBHDFS_DEFAULT_USER on subprocess, removed except IndexError hack
+- [x] Fixed preview API parsing (row vs rows mismatch)
+- [x] `hops job status <name> [--wait] [--poll N]` — track materialization jobs
+- [x] End-to-end tested: insert → preview → stats (all working)
 
 ---
 

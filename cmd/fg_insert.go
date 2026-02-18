@@ -67,6 +67,14 @@ Examples:
 		pyCmd.Stderr = os.Stderr
 		pyCmd.Stdin = os.Stdin
 
+		// Set env vars for hops-deltalake mTLS (PEM certs + HDFS user identity).
+		// PEMS_DIR must point to PEM files extracted from the pod's JKS keystores.
+		// See docs/SDK-FIXES.md for the full chain and why these are needed.
+		pyCmd.Env = append(os.Environ(),
+			"PEMS_DIR="+os.ExpandEnv("${HOME}/.hopsfs_pems"),
+			"LIBHDFS_DEFAULT_USER="+os.Getenv("HADOOP_USER_NAME"),
+		)
+
 		if err := pyCmd.Run(); err != nil {
 			return fmt.Errorf("insertion failed: %w", err)
 		}
@@ -163,11 +171,7 @@ data = {
 }
 df = pd.DataFrame(data)
 print(f"Generated {len(df)} rows, inserting...")
-try:
-    fg.insert(df, write_options=%s%s)
-except IndexError:
-    # First insert on HUDI: commit_details empty, stats fail — data already written
-    pass
+fg.insert(df, write_options=%s%s)
 print(f"Successfully inserted {len(df)} rows into {fg.name} v{fg.version}")
 `, n, fgName, fgVersion, pkList, etLine, strings.Join(colGens, "\n"), writeOptionsSnippet(onlineOnly), storageSnippet(onlineOnly))
 }
@@ -237,10 +241,7 @@ else:
         df = pd.DataFrame([data])
 
 print(f"Read {len(df)} rows from {file_path}, inserting...")
-try:
-    fg.insert(df, write_options=%s%s)
-except IndexError:
-    pass
+fg.insert(df, write_options=%s%s)
 print(f"Successfully inserted {len(df)} rows into {fg.name} v{fg.version}")
 `, fgName, fgVersion, filePath, writeOptionsSnippet(onlineOnly), storageSnippet(onlineOnly))
 }
@@ -266,10 +267,7 @@ else:
     df = pd.DataFrame([data])
 
 print(f"Read {len(df)} rows from stdin, inserting...")
-try:
-    fg.insert(df, write_options=%s%s)
-except IndexError:
-    pass
+fg.insert(df, write_options=%s%s)
 print(f"Successfully inserted {len(df)} rows into {fg.name} v{fg.version}")
 `, fgName, fgVersion, writeOptionsSnippet(onlineOnly), storageSnippet(onlineOnly))
 }
