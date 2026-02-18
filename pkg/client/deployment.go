@@ -139,11 +139,13 @@ func (c *Client) DeploymentLogs(id int, component string, tail int) (string, err
 func (c *Client) Predict(modelName string, payload json.RawMessage) (json.RawMessage, error) {
 	path := fmt.Sprintf("%s/inference/models/%s:predict", c.ProjectPath(), modelName)
 
-	// Build request body
-	body := map[string]json.RawMessage{"instances": payload}
-	bodyBytes, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshal predict body: %w", err)
+	// If payload already has "instances" key, send as-is; otherwise wrap it
+	var obj map[string]json.RawMessage
+	var bodyBytes []byte
+	if json.Unmarshal(payload, &obj) == nil && obj["instances"] != nil {
+		bodyBytes = payload
+	} else {
+		bodyBytes, _ = json.Marshal(map[string]json.RawMessage{"instances": payload})
 	}
 
 	// Use doRequest directly to get raw response
