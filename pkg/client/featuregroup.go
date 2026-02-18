@@ -154,7 +154,11 @@ type CreateFeatureGroupRequest struct {
 func (c *Client) CreateFeatureGroup(req *CreateFeatureGroupRequest) (*FeatureGroup, error) {
 	// Set required fields from client config
 	if req.Type == "" {
-		req.Type = "cachedFeaturegroupDTO"
+		if req.OnlineEnabled {
+			req.Type = "streamFeatureGroupDTO"
+		} else {
+			req.Type = "cachedFeaturegroupDTO"
+		}
 	}
 	req.FeatureStoreID = c.Config.FeatureStoreID
 

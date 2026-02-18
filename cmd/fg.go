@@ -427,7 +427,7 @@ func init() {
 	fgCreateCmd.Flags().BoolVar(&fgCreateOnline, "online", false, "Enable online storage")
 	fgCreateCmd.Flags().StringVar(&fgCreateEvtTime, "event-time", "", "Event time column")
 	fgCreateCmd.Flags().StringVar(&fgCreateDesc, "description", "", "Description")
-	fgCreateCmd.Flags().StringVar(&fgCreateFormat, "format", "", "Time travel format: HUDI or DELTA (default: server decides)")
+	fgCreateCmd.Flags().StringVar(&fgCreateFormat, "format", "DELTA", "Time travel format: DELTA or NONE")
 	fgDeleteCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version to delete")
 	fgStatsCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version")
 	fgStatsCmd.Flags().StringVar(&fgStatsFeatures, "features", "", "Filter to specific features (comma-separated)")

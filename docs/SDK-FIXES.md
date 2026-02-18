@@ -3,6 +3,24 @@
 Status: **working** — insert → preview → stats pipeline tested end-to-end
 Date: 2026-02-18
 
+## Feature Group Types — Stream vs Cached
+
+Hopsworks has two FG types with different write paths in the Python engine:
+
+| | `cachedFeaturegroupDTO` | `streamFeatureGroupDTO` |
+|---|---|---|
+| Python engine write | Direct Delta to HDFS | Kafka → online + Spark job → offline |
+| Online store | NOT populated | Populated via Kafka |
+| Offline store | Written directly (fast) | Written by materialization job (slow, ~2min) |
+| Use when | Offline-only (training data) | Online+offline (serving + training) |
+
+**The CLI picks the right type automatically:**
+- `hops fg create --online` → `streamFeatureGroupDTO`
+- `hops fg create` (no `--online`) → `cachedFeaturegroupDTO`
+
+The SDK routes based on `feature_group.stream` attribute: `True` → Kafka path, `False` → direct Delta path.
+This is critical because creating an online-enabled FG with the wrong type (cached) means data goes to HDFS but the online store stays empty.
+
 ## Problem Statement
 
 `hops fg insert` calls the Python SDK (`hsfs`) which needs to write to both:
