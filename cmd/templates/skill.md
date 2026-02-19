@@ -1,6 +1,6 @@
 ---
 name: hops
-description: Use when working with Hopsworks Feature Store — listing and managing feature groups, feature views, training datasets, models, deployments, projects, jobs, and datasets. Auto-invoke when the user discusses feature engineering, feature store operations, ML pipelines, model serving, or needs to interact with Hopsworks.
+description: Use when working with Hopsworks Feature Store — listing and managing feature groups, feature views, training datasets, storage connectors, models, deployments, projects, jobs, and datasets. Auto-invoke when the user discusses feature engineering, feature store operations, ML pipelines, model serving, external data sources, or needs to interact with Hopsworks.
 allowed-tools: Bash(hops *)
 ---
 
@@ -18,6 +18,9 @@ Feature Groups:
 
 Feature Views:
 !`hops fv list --json 2>/dev/null`
+
+Storage Connectors:
+!`hops connector list --json 2>/dev/null`
 
 Jobs:
 !`hops job list --json 2>/dev/null`
@@ -251,6 +254,47 @@ hops job status <name>                    # Latest execution status
 hops job status <name> --wait             # Poll until finished (10s default)
 hops job status <name> --wait --poll 5    # Poll every 5s
 ```
+
+### Storage Connectors
+```bash
+hops connector list                       # List all connectors
+hops connector info <name>                # Show connector details
+hops connector test <name>                # Test connection (lists databases)
+hops connector databases <name>           # List databases
+hops connector tables <name> --database X # List tables in database
+hops connector preview <name> --database X --table Y [--schema Z]  # Preview data
+hops connector delete <name>              # Delete connector
+```
+Alias: `hops conn list`, etc.
+
+#### Create Connectors
+```bash
+# Snowflake
+hops connector create snowflake <name> \
+  --url <url> --user <user> --password <pw> \
+  --database <db> --schema <schema> --warehouse <wh> \
+  [--role <role>] [--token <token>] [--description <text>]
+
+# JDBC
+hops connector create jdbc <name> \
+  --connection-string "jdbc:..." \
+  [--arguments "key=val,key=val"] [--description <text>]
+
+# S3
+hops connector create s3 <name> \
+  --bucket <bucket> --access-key <ak> --secret-key <sk> \
+  [--region <region>] [--iam-role <arn>] [--path <prefix>] [--description <text>]
+```
+
+#### External Feature Groups
+```bash
+hops fg create-external <name> \
+  --connector <connector-name> \
+  --query "SELECT ..." \
+  --primary-key <cols> \
+  [--event-time <col>] [--online] [--description <text>]
+```
+Creates an on-demand feature group backed by a storage connector. The connector must exist first.
 
 ### Other
 ```bash
