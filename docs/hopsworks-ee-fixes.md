@@ -52,3 +52,68 @@ envVars.add(new V1EnvVar().name("LIBHDFS_DEFAULT_USER").value(projectUser));
 ```
 
 The `HADOOP_USER_NAME` is already set but libhdfs reads `LIBHDFS_DEFAULT_USER` specifically.
+
+## Fix 4: Arrow Flight Server — external FG connectors in training datasets
+
+**Problem**: Two bugs in the Arrow Flight Server prevent training dataset materialization from external (on-demand) feature groups.
+
+**Impact**: `td compute` on any feature view that includes external FGs (e.g. Snowflake, JDBC) fails. `fv read` works fine because it goes through a different code path.
+
+**Where**: Arrow Flight Server pods (`arrowflight-deployment`), files in `/usr/src/app/src/`.
+
+### Bug 4a: `UnboundLocalError` in `query_engine.py`
+
+`read_query()` only assigns `connectors` inside `if/elif` branches. If neither condition is met, the variable is undefined when the `for` loop iterates it.
+
+**File**: `query_engine.py`, `read_query()` method
+
+```python
+# BEFORE (buggy):
+filters = query.get("filters", None)
+if "connectors" in query and query["connectors"]:
+    connectors = query["connectors"]
+elif "connectors_encrypted" in query and query["connectors_encrypted"] and is_query_signed:
+    connectors = json.loads(...)
+
+# AFTER (fixed):
+filters = query.get("filters", None)
+connectors = {}  # <-- initialize before conditional
+if "connectors" in query and query["connectors"]:
+    connectors = query["connectors"]
+elif "connectors_encrypted" in query and query["connectors_encrypted"] and is_query_signed:
+    connectors = json.loads(...)
+```
+
+### Bug 4b: TD creation never decrypts encrypted connectors
+
+`arrow_dataset_reader_writer.py` calls `read_query(query)` without `is_query_signed=True`, so encrypted connectors (used by external FGs) are never decrypted. The `do_get` path (used by `fv read`) works because it passes the Hopsworks signature, but the `do_action` path (used by `td compute`) doesn't.
+
+**File**: `arrow_dataset_reader_writer.py`, `create_parquet_dataset()` method
+
+```python
+# BEFORE (buggy):
+result_batches = self.query_engine.read_query(query)
+
+# AFTER (fixed):
+has_encrypted_connectors = bool(query.get("connectors_encrypted"))
+result_batches = self.query_engine.read_query(query, is_query_signed=has_encrypted_connectors)
+```
+
+This is safe because TD creation is already authenticated via client certificates and peer identity validation.
+
+### Applied as ConfigMap overlay
+
+Both fixes are deployed as a ConfigMap mount on the ArrowFlight deployment:
+
+```bash
+# ConfigMap: arrowflight-query-engine-patch
+# Mounts:
+#   query_engine.py → /usr/src/app/src/query_engine.py
+#   arrow_dataset_reader_writer.py → /usr/src/app/src/arrow_dataset_reader_writer.py
+```
+
+**To remove the patch** (e.g. after a backend upgrade that includes the fix):
+```bash
+# Remove volume mounts from deployment, then:
+kubectl -n hopsworks delete configmap arrowflight-query-engine-patch
+```
