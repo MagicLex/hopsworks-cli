@@ -115,9 +115,16 @@ func (c *Client) CreateFeatureView(name string, version int, description string,
 		"hiveEngine":       true,
 	}
 
-	// Build joins array
+	// Build joins array, nesting when leftOn belongs to a previously-joined FG
 	if len(joins) > 0 {
-		var joinList []map[string]interface{}
+		var topJoins []map[string]interface{}
+		// Track join queries by FG name so we can nest sub-joins
+		type joinNode struct {
+			query map[string]interface{} // the inner "query" object
+			fg    *FeatureGroup
+		}
+		var nodes []joinNode
+
 		for _, j := range joins {
 			// All features from the join FG
 			var rightFeatureNames []string
@@ -154,9 +161,44 @@ func (c *Client) CreateFeatureView(name string, version int, description string,
 				joinEntry["prefix"] = j.Prefix
 			}
 
-			joinList = append(joinList, joinEntry)
+			// Check if leftOn exists in the base FG
+			leftOnInBase := false
+			if len(j.LeftOn) > 0 {
+				for _, f := range baseFG.Features {
+					if f.Name == j.LeftOn[0] {
+						leftOnInBase = true
+						break
+					}
+				}
+			}
+
+			if leftOnInBase {
+				topJoins = append(topJoins, joinEntry)
+			} else {
+				// Find which previously-joined FG owns the leftOn feature and nest there
+				nested := false
+				for _, prev := range nodes {
+					for _, f := range prev.fg.Features {
+						if f.Name == j.LeftOn[0] {
+							prevJoins := prev.query["joins"].([]interface{})
+							prev.query["joins"] = append(prevJoins, joinEntry)
+							nested = true
+							break
+						}
+					}
+					if nested {
+						break
+					}
+				}
+				if !nested {
+					// Fallback: add to top level, let server validate
+					topJoins = append(topJoins, joinEntry)
+				}
+			}
+
+			nodes = append(nodes, joinNode{query: joinQuery, fg: j.FG})
 		}
-		query["joins"] = joinList
+		query["joins"] = topJoins
 	}
 
 	req["query"] = query
@@ -217,9 +259,12 @@ func (c *Client) CreateFeatureView(name string, version int, description string,
 }
 
 func (c *Client) buildFGRef(fg *FeatureGroup) map[string]interface{} {
-	fgType := "cachedFeaturegroupDTO"
-	if fg.OnlineEnabled {
-		fgType = "streamFeatureGroupDTO"
+	fgType := fg.Type
+	if fgType == "" {
+		fgType = "cachedFeaturegroupDTO"
+		if fg.OnlineEnabled {
+			fgType = "streamFeatureGroupDTO"
+		}
 	}
 	return map[string]interface{}{
 		"id":             fg.ID,
@@ -297,32 +342,47 @@ func (c *Client) GetFeatureViewQuery(name string, version int) (*FVQueryInfo, er
 		}
 	}
 
-	// Joins
-	if joins, ok := raw["joins"].([]interface{}); ok {
-		for _, j := range joins {
-			jm, ok := j.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			join := FVQueryJoin{}
-			if jt, ok := jm["type"].(string); ok {
-				join.Type = jt
-			}
-			if prefix, ok := jm["prefix"].(string); ok {
-				join.Prefix = prefix
-			}
-			if jq, ok := jm["query"].(map[string]interface{}); ok {
-				if lfg, ok := jq["leftFeatureGroup"].(map[string]interface{}); ok {
-					join.FGName, _ = lfg["name"].(string)
-					ver, _ := lfg["version"].(float64)
-					join.Version = int(ver)
-				}
-			}
-			info.Joins = append(info.Joins, join)
-		}
-	}
+	// Joins (recursive to handle nested/chained joins)
+	info.Joins = parseQueryJoins(raw)
+
 
 	return info, nil
+}
+
+// parseQueryJoins recursively extracts joins from a query map,
+// flattening nested joins into a single list.
+func parseQueryJoins(query map[string]interface{}) []FVQueryJoin {
+	joins, ok := query["joins"].([]interface{})
+	if !ok {
+		return nil
+	}
+	var result []FVQueryJoin
+	for _, j := range joins {
+		jm, ok := j.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		join := FVQueryJoin{}
+		if jt, ok := jm["type"].(string); ok {
+			join.Type = jt
+		}
+		if prefix, ok := jm["prefix"].(string); ok {
+			join.Prefix = prefix
+		}
+		if jq, ok := jm["query"].(map[string]interface{}); ok {
+			if lfg, ok := jq["leftFeatureGroup"].(map[string]interface{}); ok {
+				join.FGName, _ = lfg["name"].(string)
+				ver, _ := lfg["version"].(float64)
+				join.Version = int(ver)
+			}
+			// Recurse into nested joins
+			result = append(result, join)
+			result = append(result, parseQueryJoins(jq)...)
+		} else {
+			result = append(result, join)
+		}
+	}
+	return result
 }
 
 func (c *Client) DeleteFeatureView(name string, version int) error {
