@@ -3,7 +3,8 @@
 Status: in progress
 
 ## What exists
-- **FG:** list, info, preview, features, create (with embeddings), delete, insert (Python SDK), stats, search (KNN), derive (join + provenance)
+- **FG:** list, info, preview, features, create (with embeddings), create-external, delete, insert (Python SDK), stats, search (KNN), derive (join + provenance)
+- **Connector:** list, info, test, databases, tables, preview, create (snowflake/jdbc/s3), delete
 - **FV:** list, info (shows source FGs + joins), create (multi-FG joins + transforms), get (online vectors), read (batch offline), delete
 - **Transformations:** list, create (file + inline @udf)
 - **TD:** list, create, compute (materialize with splits), read (retrieve with splits), delete
@@ -39,14 +40,15 @@ Status: in progress
 
 ---
 
-## Phase 2: Storage Connectors + External FGs
+## Phase 2: Storage Connectors + External FGs — DONE
 > Unlocks on-demand feature groups (JDBC, S3, etc.)
 
-- [ ] `pkg/client/connector.go` — StorageConnector DTOs + list
-- [ ] `cmd/connector.go` — `hops connector list`
-- [ ] `pkg/client/featuregroup.go` — add external FG support (onDemandFeaturegroupDTO)
-- [ ] `cmd/fg.go` — `hops fg create-external <name> --connector <name> --query "SQL" --features "col:type,..."`
-- [ ] Test against live cluster
+- [x] `pkg/client/connector.go` — StorageConnector + DataSource DTOs, all REST methods (List, Get, Create, Delete, GetDatabases, GetTables, GetData, GetMetadata)
+- [x] `cmd/connector.go` — `hops connector {list, info, test, databases, tables, preview, create {snowflake, jdbc, s3}, delete}` with `conn` alias
+- [x] `cmd/fg_external.go` — `hops fg create-external <name> --connector <name> --query "SQL" --primary-key <cols>` (Python SDK delegation)
+- [x] `pkg/client/featuregroup.go` — added Type, StorageConnector, DataSource fields + FGTypeLabel() helper
+- [x] `cmd/fg.go` — TYPE column in `fg list` (cached/stream/external), connector + query in `fg info`
+- [x] Full CRUD cycle tested against live cluster (create JDBC connector, info, delete)
 
 ## Phase 3: FV Create with Joins — DONE
 > Core structural change — multi-FG feature views.

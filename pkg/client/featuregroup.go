@@ -28,6 +28,7 @@ type EmbeddingIndex struct {
 }
 
 type FeatureGroup struct {
+	Type             string          `json:"type,omitempty"` // cachedFeaturegroupDTO, streamFeatureGroupDTO, onDemandFeaturegroupDTO
 	ID               int             `json:"id"`
 	Name             string          `json:"name"`
 	Version          int             `json:"version"`
@@ -40,6 +41,22 @@ type FeatureGroup struct {
 	NumRows          *int64          `json:"numRows,omitempty"`
 	Location         string          `json:"location,omitempty"`
 	EmbeddingIndex   *EmbeddingIndex `json:"embeddingIndex,omitempty"`
+	StorageConnector *StorageConnector `json:"storageConnector,omitempty"`
+	DataSource       *DataSource       `json:"dataSource,omitempty"`
+}
+
+// FGTypeLabel returns a human-readable type label from the DTO type discriminator.
+func (fg *FeatureGroup) FGTypeLabel() string {
+	switch fg.Type {
+	case "onDemandFeaturegroupDTO":
+		return "external"
+	case "streamFeatureGroupDTO":
+		return "stream"
+	case "cachedFeaturegroupDTO":
+		return "cached"
+	default:
+		return fg.Type
+	}
 }
 
 type FeatureGroupList struct {

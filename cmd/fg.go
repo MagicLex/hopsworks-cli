@@ -38,7 +38,7 @@ var fgListCmd = &cobra.Command{
 			return nil
 		}
 
-		headers := []string{"NAME", "VERSION", "ONLINE", "FEATURES", "DESCRIPTION"}
+		headers := []string{"NAME", "VERSION", "TYPE", "ONLINE", "FEATURES", "DESCRIPTION"}
 		var rows [][]string
 		for _, fg := range fgs {
 			online := "no"
@@ -48,6 +48,7 @@ var fgListCmd = &cobra.Command{
 			rows = append(rows, []string{
 				fg.Name,
 				strconv.Itoa(fg.Version),
+				fg.FGTypeLabel(),
 				online,
 				strconv.Itoa(len(fg.Features)),
 				truncate(fg.Description, 40),
@@ -80,12 +81,19 @@ var fgInfoCmd = &cobra.Command{
 
 		output.Info("Feature Group: %s (v%d)", fg.Name, fg.Version)
 		output.Info("ID: %d", fg.ID)
+		output.Info("Type: %s", fg.FGTypeLabel())
 		output.Info("Online: %v", fg.OnlineEnabled)
 		if fg.Description != "" {
 			output.Info("Description: %s", fg.Description)
 		}
 		if fg.EventTime != "" {
 			output.Info("Event Time: %s", fg.EventTime)
+		}
+		if fg.StorageConnector != nil {
+			output.Info("Connector: %s (%s)", fg.StorageConnector.Name, fg.StorageConnector.StorageConnectorType)
+		}
+		if fg.DataSource != nil && fg.DataSource.Query != "" {
+			output.Info("Query: %s", fg.DataSource.Query)
 		}
 		output.Info("")
 

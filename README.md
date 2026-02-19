@@ -92,6 +92,23 @@ hops deployment logs testmodel --tail 100
 hops deployment stop testmodel
 hops deployment delete testmodel
 
+# Storage connectors (external data sources)
+hops connector list
+hops connector create snowflake my_sf \
+  --url "https://xyz.snowflakecomputing.com" \
+  --user admin --password secret --database MY_DB --schema PUBLIC --warehouse MY_WH
+hops connector test my_sf
+hops connector databases my_sf
+hops connector tables my_sf --database MY_DB
+hops connector preview my_sf --database MY_DB --table sales
+hops connector delete my_sf
+
+# External feature groups (backed by a connector)
+hops fg create-external sales_fg \
+  --connector my_sf \
+  --query "SELECT id, name, amount FROM sales" \
+  --primary-key id
+
 # Context dump (for LLMs)
 hops context
 ```
@@ -103,7 +120,8 @@ hops context
 | `hops login` | Authenticate with Hopsworks |
 | `hops project list\|use\|info` | Manage projects |
 | `hops fs list` | List feature stores |
-| `hops fg list\|info\|preview\|features\|create\|delete\|insert\|derive\|search` | Feature groups (with embeddings + KNN) |
+| `hops fg list\|info\|preview\|features\|create\|create-external\|delete\|insert\|derive\|search` | Feature groups (with embeddings + KNN) |
+| `hops connector list\|info\|test\|databases\|tables\|preview\|create\|delete` | Storage connectors (Snowflake, JDBC, S3) |
 | `hops fv list\|info\|create\|get\|read\|delete` | Feature views (joins + transforms + online/batch read) |
 | `hops transformation list\|create` | Transformation functions |
 | `hops td list\|create\|compute\|read\|delete` | Training datasets (materialize + retrieve with splits) |
