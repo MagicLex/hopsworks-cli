@@ -111,13 +111,22 @@ Examples:
 			if len(result.Features) == 0 {
 				return fmt.Errorf("no features returned from connector — use --features to specify schema manually")
 			}
+
+			// Parse query to find which columns are selected (handles SELECT col1, col2 FROM ...)
+			queryCols := parseSelectColumns(fgExtQuery)
+
 			for _, f := range result.Features {
+				// If query selects specific columns, skip features not in the query
+				if len(queryCols) > 0 && !queryCols[strings.ToUpper(f.Name)] {
+					continue
+				}
 				typ := f.Type
 				if typ == "" {
 					typ = "string"
 				}
+				// Preserve original casing from the data source (Snowflake needs uppercase)
 				features = append(features, client.Feature{
-					Name:    strings.ToLower(f.Name),
+					Name:    f.Name,
 					Type:    typ,
 					Primary: pkSet[strings.ToLower(f.Name)],
 				})
@@ -218,6 +227,41 @@ fg = fs.create_external_feature_group(
 fg.save()
 print(f"Created external feature group '{fg.name}' v{fg.version} (ID: {fg.id})")
 `, connector, name, query, pkList, featuresBlock, etLine, onlineLine, descLine)
+}
+
+// parseSelectColumns extracts column names from a SQL SELECT query.
+// Returns a map of uppercase column names, or empty map for SELECT *.
+func parseSelectColumns(query string) map[string]bool {
+	upper := strings.ToUpper(strings.TrimSpace(query))
+	if !strings.HasPrefix(upper, "SELECT") {
+		return nil
+	}
+
+	// Find text between SELECT and FROM
+	fromIdx := strings.Index(upper, " FROM ")
+	if fromIdx < 0 {
+		return nil
+	}
+	selectPart := strings.TrimSpace(query[6:fromIdx]) // skip "SELECT"
+	if selectPart == "*" {
+		return nil // SELECT * = all columns
+	}
+
+	cols := make(map[string]bool)
+	for _, col := range splitComma(selectPart) {
+		col = trimSpace(col)
+		// Handle "table.column" -> take column part
+		if dotIdx := strings.LastIndex(col, "."); dotIdx >= 0 {
+			col = col[dotIdx+1:]
+		}
+		// Handle "column AS alias" -> take alias
+		upperCol := strings.ToUpper(col)
+		if asIdx := strings.Index(upperCol, " AS "); asIdx >= 0 {
+			col = trimSpace(col[asIdx+4:])
+		}
+		cols[strings.ToUpper(col)] = true
+	}
+	return cols
 }
 
 func init() {

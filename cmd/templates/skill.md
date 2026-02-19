@@ -288,13 +288,32 @@ hops connector create s3 <name> \
 
 #### External Feature Groups
 ```bash
+# Auto-infer schema from connector (recommended)
+hops fg create-external <name> \
+  --connector <connector-name> \
+  --query "SELECT COL1, COL2 FROM DB.SCHEMA.TABLE" \
+  --database <db> --table <table> --schema <schema> \
+  --primary-key <cols> \
+  [--event-time <col>] [--online] [--description <text>]
+
+# Explicit schema (no auto-inference)
 hops fg create-external <name> \
   --connector <connector-name> \
   --query "SELECT ..." \
-  --primary-key <cols> \
-  [--event-time <col>] [--online] [--description <text>]
+  --features "col1:bigint,col2:string" \
+  --primary-key <cols>
 ```
 Creates an on-demand feature group backed by a storage connector. The connector must exist first.
+
+Flags:
+- `--connector <name>` — storage connector name (required)
+- `--query <sql>` — SQL query for the external data source (required)
+- `--primary-key <cols>` — primary key columns, comma-separated (required)
+- `--database <db>` + `--table <tbl>` + `--schema <sch>` — auto-infer features from connector
+- `--features "name:type,..."` — explicit schema (skips auto-inference)
+- `--event-time <col>`, `--online`, `--description <text>` — optional
+
+**Snowflake note**: Use UPPERCASE column names in `--query` and `--features`. Snowflake identifiers are case-sensitive and default to uppercase.
 
 ### Other
 ```bash
