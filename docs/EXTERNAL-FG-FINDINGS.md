@@ -97,9 +97,17 @@ When capturing Python output for JSON, these pollute the result. Handled two way
 - `contextlib.redirect_stdout(os.devnull)` around login
 - `extractJSON()` in Go to find the first `{`-prefixed line
 
-## 8. Feature Type Detection
+## 8. Arrow Flight Returns DECIMAL Columns as Strings
 
-Pandas reads some numeric columns (e.g. `c_acctbal`, `o_totalprice`) as `object` dtype when they come through the Arrow Flight path. This means statistics (min/max/mean/stddev) aren't computed for them. This is a data type inference issue in the Arrow Flight → pandas conversion, not a CLI bug.
+**Upstream bug.** The Arrow Flight server (or Snowflake connector) returns `DECIMAL`/`NUMBER` columns as Python `object` (string) dtype instead of `float64`. Affected columns in TPC-H: `c_acctbal` (DECIMAL(15,2)), `o_totalprice` (DECIMAL(15,2)).
+
+**Impact**: Without mitigation, pandas sees these as strings and skips numeric statistics (min/max/mean/stddev).
+
+**Root cause**: Likely in the Arrow Flight query engine's type mapping for external connectors — Snowflake `NUMBER`/`DECIMAL` types aren't being mapped to Arrow decimal or float types before serialization.
+
+**CLI workaround** (in `buildTDStatsComputeScript`): Before computing stats, object columns are coerced with `pd.to_numeric(errors="coerce")`. If any values convert successfully, the column is promoted to `float64`. This is safe — truly non-numeric columns (like `o_orderstatus`) fail coercion and stay as `object`.
+
+**Proper fix**: Should be in the Arrow Flight server's type conversion layer, mapping Snowflake DECIMAL → Arrow Decimal128 or Float64. This would fix all downstream consumers, not just our stats script.
 
 ## 9. External FGs and the `StatisticsConfig`
 

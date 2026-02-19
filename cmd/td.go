@@ -472,6 +472,12 @@ from hsfs.core.statistics_api import StatisticsApi
 stats_list = []
 for col in df.columns:
     s = df[col]
+    # Arrow Flight returns some numeric columns (e.g. DECIMAL) as object/strings — coerce them
+    if s.dtype == "object":
+        coerced = pd.to_numeric(s, errors="coerce")
+        if coerced.notna().sum() > 0:
+            s = coerced
+            df[col] = s
     fs_dict = {"featureName": col, "featureType": str(s.dtype)}
     fs_dict["count"] = int(s.count())
     fs_dict["numNullValues"] = int(s.isna().sum())
