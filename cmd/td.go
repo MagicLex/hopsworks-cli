@@ -315,6 +315,187 @@ print(f'Read {len(df)} rows, {len(df.columns)} columns', file=sys.stderr)
 	return sb.String()
 }
 
+// --- td stats ---
+
+var (
+	tdStatsVersion  int
+	tdStatsFeatures string
+	tdStatsCompute  bool
+)
+
+var tdStatsCmd = &cobra.Command{
+	Use:   "stats <fv-name> <fv-version>",
+	Short: "Show or compute training dataset statistics",
+	Long: `Show computed statistics for a training dataset, or trigger computation.
+
+Examples:
+  # Show latest stats
+  hops td stats snowflake_customer_orders 1 --td-version 4
+
+  # Filter to specific features
+  hops td stats my_view 1 --td-version 1 --features amount,age
+
+  # Trigger stats computation
+  hops td stats my_view 1 --td-version 1 --compute`,
+	Args: cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fvVer, err := strconv.Atoi(args[1])
+		if err != nil {
+			return fmt.Errorf("invalid version: %s", args[1])
+		}
+		if tdStatsVersion == 0 {
+			return fmt.Errorf("--td-version is required")
+		}
+
+		c, err := mustClient()
+		if err != nil {
+			return err
+		}
+
+		if tdStatsCompute {
+			if !output.JSONMode {
+				output.Info("Computing statistics for '%s' v%d TD v%d...", args[0], fvVer, tdStatsVersion)
+			}
+			script := buildTDStatsComputeScript(args[0], fvVer, tdStatsVersion)
+			rawOutput, err := runPythonCapture(script)
+			if err != nil {
+				return fmt.Errorf("statistics computation failed: %w", err)
+			}
+			// Extract JSON object from output (skip SDK log lines)
+			statsJSON := extractJSON(rawOutput)
+			if statsJSON == nil {
+				return fmt.Errorf("no statistics JSON in Python output")
+			}
+			// Register via Go client
+			if err := c.RegisterTrainingDatasetStatistics(args[0], fvVer, tdStatsVersion, statsJSON); err != nil {
+				return fmt.Errorf("failed to register statistics: %w", err)
+			}
+			if !output.JSONMode {
+				output.Success("Statistics computed and registered for '%s' v%d TD v%d", args[0], fvVer, tdStatsVersion)
+			}
+			return nil
+		}
+
+		var featureNames []string
+		if tdStatsFeatures != "" {
+			featureNames = splitComma(tdStatsFeatures)
+		}
+
+		stats, err := c.GetTrainingDatasetStatistics(args[0], fvVer, tdStatsVersion, featureNames)
+		if err != nil {
+			return err
+		}
+
+		if stats == nil {
+			if output.JSONMode {
+				output.PrintJSON(struct{}{})
+				return nil
+			}
+			output.Info("No statistics computed for TD v%d. Use --compute to trigger.", tdStatsVersion)
+			return nil
+		}
+
+		if output.JSONMode {
+			output.PrintJSON(stats)
+			return nil
+		}
+
+		if stats.ComputationTime != nil {
+			output.Info("Statistics for '%s' v%d TD v%d (computed: %d)", args[0], fvVer, tdStatsVersion, *stats.ComputationTime)
+		} else {
+			output.Info("Statistics for '%s' v%d TD v%d", args[0], fvVer, tdStatsVersion)
+		}
+		output.Info("")
+
+		if len(stats.FeatureDescriptiveStatistics) == 0 {
+			output.Info("No feature statistics available")
+			return nil
+		}
+
+		headers := []string{"FEATURE", "TYPE", "COUNT", "MEAN", "MIN", "MAX", "STDDEV", "NULLS", "COMPLETENESS"}
+		var rows [][]string
+		for _, fs := range stats.FeatureDescriptiveStatistics {
+			rows = append(rows, []string{
+				fs.FeatureName,
+				fs.FeatureType,
+				fmtInt64(fs.Count),
+				fmtFloat64(fs.Mean),
+				fmtFloat64(fs.Min),
+				fmtFloat64(fs.Max),
+				fmtFloat64(fs.Stddev),
+				fmtInt64(fs.NumNullValues),
+				fmtFloat32Pct(fs.Completeness),
+			})
+		}
+		output.Table(headers, rows)
+		return nil
+	},
+}
+
+// extractJSON finds the first line starting with '{' in raw output and returns it as bytes.
+func extractJSON(raw []byte) []byte {
+	for _, line := range strings.Split(string(raw), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "{") {
+			return []byte(trimmed)
+		}
+	}
+	return nil
+}
+
+func buildTDStatsComputeScript(fvName string, fvVer, tdVer int) string {
+	return fmt.Sprintf(`import hopsworks, warnings, logging, sys, os, contextlib
+warnings.filterwarnings("ignore")
+logging.getLogger("hsfs").setLevel(logging.WARNING)
+logging.getLogger("hopsworks").setLevel(logging.WARNING)
+
+# Suppress SDK login messages from stdout
+with contextlib.redirect_stdout(open(os.devnull, "w")):
+    project = hopsworks.login()
+    fs = project.get_feature_store()
+fv = fs.get_feature_view(name=%q, version=%d)
+
+# Read materialized TD data
+X, y = fv.get_training_data(training_dataset_version=%d)
+import pandas as pd
+if y is not None and len(y.columns) > 0:
+    df = pd.concat([X, y], axis=1)
+else:
+    df = X
+
+print(f"Read {len(df)} rows, {len(df.columns)} columns for stats", file=sys.stderr)
+
+# Compute descriptive statistics
+import json, time
+from hsfs.core.statistics_api import StatisticsApi
+
+stats_list = []
+for col in df.columns:
+    s = df[col]
+    fs_dict = {"featureName": col, "featureType": str(s.dtype)}
+    fs_dict["count"] = int(s.count())
+    fs_dict["numNullValues"] = int(s.isna().sum())
+    fs_dict["completeness"] = float(s.count() / len(s)) if len(s) > 0 else 0.0
+    if s.dtype in ("int64", "float64", "int32", "float32"):
+        fs_dict["min"] = float(s.min()) if s.count() > 0 else None
+        fs_dict["max"] = float(s.max()) if s.count() > 0 else None
+        fs_dict["mean"] = float(s.mean()) if s.count() > 0 else None
+        fs_dict["stddev"] = float(s.std()) if s.count() > 0 else None
+        fs_dict["sum"] = float(s.sum()) if s.count() > 0 else None
+    fs_dict["approxNumDistinctValues"] = int(s.nunique())
+    stats_list.append(fs_dict)
+
+# Output stats as JSON for the Go client to register
+result = {
+    "computationTime": int(time.time() * 1000),
+    "rowPercentage": 1.0,
+    "beforeTransformation": False,
+    "featureDescriptiveStatistics": stats_list,
+}
+print(json.dumps(result))
+`, fvName, fvVer, tdVer)
+}
+
 func init() {
 	rootCmd.AddCommand(tdCmd)
 
@@ -329,9 +510,14 @@ func init() {
 	tdReadCmd.Flags().StringVar(&tdReadOutput, "output", "", "Save to file (.parquet, .csv, .json)")
 	tdReadCmd.Flags().StringVar(&tdReadSplit, "split", "", "Read specific split (train, test)")
 
+	tdStatsCmd.Flags().IntVar(&tdStatsVersion, "td-version", 0, "Training dataset version (required)")
+	tdStatsCmd.Flags().StringVar(&tdStatsFeatures, "features", "", "Filter features (comma-separated)")
+	tdStatsCmd.Flags().BoolVar(&tdStatsCompute, "compute", false, "Trigger statistics computation")
+
 	tdCmd.AddCommand(tdListCmd)
 	tdCmd.AddCommand(tdCreateCmd)
 	tdCmd.AddCommand(tdDeleteCmd)
 	tdCmd.AddCommand(tdComputeCmd)
 	tdCmd.AddCommand(tdReadCmd)
+	tdCmd.AddCommand(tdStatsCmd)
 }

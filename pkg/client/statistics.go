@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -72,6 +73,55 @@ func (c *Client) GetFeatureGroupStatistics(fgID int, featureNames []string) (*St
 
 func (c *Client) ComputeFeatureGroupStatistics(fgID int) (*ComputeJobResponse, error) {
 	path := fmt.Sprintf("%s/featuregroups/%d/statistics/compute", c.FSPath(), fgID)
+
+	data, err := c.Post(path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var job ComputeJobResponse
+	if err := json.Unmarshal(data, &job); err != nil {
+		return nil, fmt.Errorf("parse compute response: %w", err)
+	}
+	return &job, nil
+}
+
+func (c *Client) GetTrainingDatasetStatistics(fvName string, fvVersion, tdVersion int, featureNames []string) (*Statistics, error) {
+	path := fmt.Sprintf("%s/featureview/%s/version/%d/trainingdatasets/version/%d/statistics?fields=content&sort_by=computation_time:desc&offset=0&limit=1",
+		c.FSPath(), fvName, fvVersion, tdVersion)
+
+	if len(featureNames) > 0 {
+		path += "&feature_names=" + strings.Join(featureNames, ",")
+	}
+
+	data, err := c.Get(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp StatisticsResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("parse statistics: %w", err)
+	}
+
+	if resp.Count == 0 || len(resp.Items) == 0 {
+		return nil, nil
+	}
+
+	return &resp.Items[0], nil
+}
+
+func (c *Client) RegisterTrainingDatasetStatistics(fvName string, fvVersion, tdVersion int, statsJSON []byte) error {
+	path := fmt.Sprintf("%s/featureview/%s/version/%d/trainingdatasets/version/%d/statistics",
+		c.FSPath(), fvName, fvVersion, tdVersion)
+
+	_, err := c.Post(path, bytes.NewReader(statsJSON))
+	return err
+}
+
+func (c *Client) ComputeTrainingDatasetStatistics(fvName string, fvVersion, tdVersion int) (*ComputeJobResponse, error) {
+	path := fmt.Sprintf("%s/featureview/%s/version/%d/trainingdatasets/version/%d/statistics/compute",
+		c.FSPath(), fvName, fvVersion, tdVersion)
 
 	data, err := c.Post(path, nil)
 	if err != nil {

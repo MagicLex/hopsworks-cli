@@ -43,6 +43,18 @@ func runPython(script string) error {
 	return pyCmd.Run()
 }
 
+// runPythonCapture executes a Python script and captures stdout (stderr goes to terminal).
+func runPythonCapture(script string) ([]byte, error) {
+	pyCmd := exec.Command("python3", "-c", script)
+	pyCmd.Stderr = os.Stderr
+	pyCmd.Stdin = os.Stdin
+	pyCmd.Env = append(os.Environ(),
+		"PEMS_DIR="+os.ExpandEnv("${HOME}/.hopsfs_pems"),
+		"LIBHDFS_DEFAULT_USER="+os.Getenv("HADOOP_USER_NAME"),
+	)
+	return pyCmd.Output()
+}
+
 // pythonLiteral converts a string to a Python literal (number or quoted string).
 func pythonLiteral(s string) string {
 	isNum := true
