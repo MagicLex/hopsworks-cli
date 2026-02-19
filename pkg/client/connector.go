@@ -55,10 +55,31 @@ type DataSource struct {
 }
 
 // DataSourceData holds preview data returned from the data_source/data endpoint.
+// The preview field has nested structure: {preview: [{values: [{value0: col, value1: val}, ...]}, ...]}
 type DataSourceData struct {
-	Limit    int                      `json:"limit,omitempty"`
-	Features []Feature                `json:"features,omitempty"`
-	Preview  []map[string]interface{} `json:"preview,omitempty"`
+	Limit    int       `json:"limit,omitempty"`
+	Features []Feature `json:"features,omitempty"`
+	Preview  struct {
+		Preview []struct {
+			Values []struct {
+				Value0 string `json:"value0"`
+				Value1 string `json:"value1"`
+			} `json:"values"`
+		} `json:"preview"`
+	} `json:"preview"`
+}
+
+// PreviewRows converts the nested preview format into flat column→value maps.
+func (d *DataSourceData) PreviewRows() []map[string]string {
+	var rows []map[string]string
+	for _, row := range d.Preview.Preview {
+		r := make(map[string]string)
+		for _, v := range row.Values {
+			r[v.Value0] = v.Value1
+		}
+		rows = append(rows, r)
+	}
+	return rows
 }
 
 func (c *Client) connectorsPath() string {

@@ -77,12 +77,20 @@ func (c *Client) doRequest(method, path string, body io.Reader) ([]byte, error) 
 		var errResp struct {
 			ErrorMsg string `json:"errorMsg"`
 			UsrMsg   string `json:"usrMsg"`
+			DevMsg   string `json:"devMsg"`
 		}
-		if json.Unmarshal(data, &errResp) == nil && errResp.UsrMsg != "" {
-			return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, errResp.UsrMsg)
-		}
-		if errResp.ErrorMsg != "" {
-			return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, errResp.ErrorMsg)
+		if json.Unmarshal(data, &errResp) == nil {
+			msg := errResp.UsrMsg
+			if msg == "" {
+				msg = errResp.ErrorMsg
+			}
+			// Append devMsg when it has extra detail (e.g. Snowflake auth failures)
+			if msg != "" && errResp.DevMsg != "" && errResp.DevMsg != msg {
+				return nil, fmt.Errorf("API error (%d): %s — %s", resp.StatusCode, msg, errResp.DevMsg)
+			}
+			if msg != "" {
+				return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, msg)
+			}
 		}
 		return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, string(data))
 	}

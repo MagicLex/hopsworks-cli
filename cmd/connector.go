@@ -284,33 +284,38 @@ var connectorPreviewCmd = &cobra.Command{
 			return err
 		}
 
+		previewRows := result.PreviewRows()
+
 		if output.JSONMode {
-			output.PrintJSON(result)
+			output.PrintJSON(previewRows)
 			return nil
 		}
 
-		if len(result.Preview) == 0 {
+		if len(previewRows) == 0 {
 			output.Info("No data returned")
 			return nil
 		}
 
-		// Build headers from Features if available, else from first row keys
+		// Use keys from first preview row as headers (preserves actual casing)
 		var headers []string
-		if len(result.Features) > 0 {
-			for _, f := range result.Features {
-				headers = append(headers, f.Name)
-			}
-		} else {
-			for k := range result.Preview[0] {
-				headers = append(headers, k)
+		if len(previewRows[0]) > 0 {
+			// Maintain feature order from API if available
+			if len(result.Features) > 0 {
+				for _, f := range result.Features {
+					headers = append(headers, strings.ToLower(f.Name))
+				}
+			} else {
+				for k := range previewRows[0] {
+					headers = append(headers, k)
+				}
 			}
 		}
 
 		var rows [][]string
-		for _, row := range result.Preview {
+		for _, row := range previewRows {
 			var r []string
 			for _, h := range headers {
-				r = append(r, fmt.Sprintf("%v", row[h]))
+				r = append(r, row[h])
 			}
 			rows = append(rows, r)
 		}
