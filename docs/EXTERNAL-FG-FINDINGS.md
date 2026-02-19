@@ -114,3 +114,37 @@ When capturing Python output for JSON, these pollute the result. Handled two way
 When creating external FGs, stats must be disabled: `StatisticsConfig(enabled=False)`. If enabled, the system tries to run a Spark job to compute stats on the external data source, which fails because Spark can't reach the external DB.
 
 Training dataset stats are different — the data is already materialized as parquet on HopsFS, so stats can be computed from the local copy.
+
+## 10. Model Deployment — KServe Artifact Mounting
+
+The `storage-initializer` init container downloads model files from HopsFS into the pod:
+
+- **Predictor script** → `/mnt/artifacts/predictor-<script>.py` (from `Deployments/<name>/<version>/`)
+- **Model files** → `/mnt/models/` (from `Models/<name>/<version>/Files/`)
+
+The predictor script must look in `/mnt/models/` for `model.pkl` and other artifacts — NOT in `ARTIFACT_FILES_PATH` (`/mnt/artifacts/`), which only contains the script itself.
+
+## 11. sklearn Version Mismatch — Serving Environment
+
+The serving conda env (`hopsworks_environment`) ships with **sklearn 1.3.2**, numpy 1.26.4, pandas 2.3.1. Pickle files are not backwards-compatible across sklearn major versions.
+
+**Impact**: If you train with a newer sklearn (e.g. 1.8.0), `joblib.load()` in the serving container will fail with `ModuleNotFoundError: No module named '_loss'` or similar.
+
+**Fix**: Always train with the same sklearn version as the serving environment. Check with a probe deployment if unsure.
+
+## 12. KServe Predict Input Format
+
+The `predict(self, inputs)` method receives **a list** (the instances array), not the full `{"instances": [...]}` dict. The Hopsworks KServe wrapper unwraps the payload before calling `predict()`.
+
+```python
+def predict(self, inputs):
+    # inputs is already the instances list, not {"instances": [...]}
+    if isinstance(inputs, list):
+        instances = inputs
+    else:
+        instances = inputs.get("instances", [])
+```
+
+## 13. Deployment Name Constraints
+
+Serving names must match `[a-zA-Z0-9]+` — no hyphens, underscores, or special characters. The API returns a 422 if the name contains invalid characters.
