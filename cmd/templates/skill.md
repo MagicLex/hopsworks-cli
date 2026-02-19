@@ -247,6 +247,65 @@ Flags for logs:
 - `--tail <n>` — number of log lines (default: 50)
 - `--component <predictor|transformer>` — log component (default: predictor)
 
+#### Deployment Guide — Important Gotchas
+
+**Deployment names** must be alphanumeric only (`[a-zA-Z0-9]+`). No hyphens, underscores, or special characters.
+
+**Predictor script** — KServe deployments need a `predict.py` with a `Predict` class:
+
+```python
+import os
+import joblib
+import numpy as np
+
+class Predict:
+    def __init__(self):
+        # Model artifacts are in /mnt/models/ (NOT /mnt/artifacts/)
+        # /mnt/artifacts/ only contains the predictor script itself
+        model_dir = "/mnt/models"
+        self.model = joblib.load(os.path.join(model_dir, "model.pkl"))
+
+    def predict(self, inputs):
+        # inputs is a LIST (instances), not {"instances": [...]} dict
+        # KServe unwraps the payload before calling predict()
+        if isinstance(inputs, list):
+            instances = inputs
+        else:
+            instances = inputs.get("instances", [])
+        predictions = self.model.predict(np.array(instances))
+        return {"predictions": predictions.tolist()}
+```
+
+**sklearn version**: The serving environment uses **sklearn 1.3.2**, numpy 1.26.4, pandas 2.3.1. You MUST train with the same sklearn version — pickle is not backwards-compatible across major versions. Install with `pip install scikit-learn==1.3.2` before training.
+
+**Artifact paths**: The `storage-initializer` init container downloads files from HopsFS:
+- Predictor script → `/mnt/artifacts/predictor-<script>.py`
+- Model files (from `Models/<name>/<version>/Files/`) → `/mnt/models/`
+
+**Updating a deployment**: `start`/`stop` does NOT refresh the predictor script or model files. You must `delete` then `create` a new deployment to pick up changes.
+
+#### Typical Deploy Flow
+```bash
+# 1. Train with matching sklearn version
+pip install scikit-learn==1.3.2
+python train.py  # saves model.pkl to a local dir
+
+# 2. Register model (uploads artifacts to HopsFS Models/<name>/<version>/Files/)
+hops model register mymodel ./model_dir \
+  --framework sklearn --feature-view my_fv --td-version 1 \
+  --metrics "mae=100,r2=0.85"
+
+# 3. Upload predictor script to model dir
+cp predict.py /hopsfs/Models/mymodel/1/Files/predict.py
+
+# 4. Create and start deployment
+hops deployment create mymodel --script predict.py --name mymodel
+hops deployment start mymodel
+
+# 5. Test
+hops deployment predict mymodel --data '{"instances": [...]}'
+```
+
 ### Jobs
 ```bash
 hops job list                             # List jobs
