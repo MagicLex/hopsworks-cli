@@ -309,10 +309,31 @@ hops deployment predict mymodel --data '{"instances": [...]}'
 ### Jobs
 ```bash
 hops job list                             # List jobs
-hops job status <name>                    # Latest execution status
-hops job status <name> --wait             # Poll until finished (10s default)
-hops job status <name> --wait --poll 5    # Poll every 5s
+hops job info <name>                      # Show job config details
+hops job create <name> --type <type> --app-path <path>  # Create job
+hops job run <name> [--wait] [--args "..."]             # Start execution
+hops job stop <name> [--exec ID]          # Stop running execution
+hops job status <name> [--wait] [--poll 5]              # Latest execution status
+hops job logs <name> [--exec ID] [--type out|err]       # Execution logs
+hops job history <name> [--limit N]       # List executions
+hops job delete <name>                    # Delete job
+hops job schedule <name> "<cron>"         # Set cron schedule
+hops job schedule-info <name>             # Show schedule
+hops job unschedule <name>                # Remove schedule
 ```
+
+Flags for create:
+- `--type <python|pyspark|spark|ray>` — job type (required)
+- `--app-path <path>` — script/JAR path (required). Python: relative (`Resources/jobs/x.py`), Spark: HDFS (`hdfs:///Projects/...`)
+- `--main-class <class>` — main class for Spark JARs
+- `--args <string>` — default arguments
+- `--env-name <name>` — conda environment
+- `--driver-mem`, `--driver-cores`, `--executor-mem`, `--executor-cores`, `--executors`, `--dynamic` — Spark resources
+- `--memory`, `--cores`, `--gpus` — Python resources
+- `--worker-mem`, `--worker-cores`, `--workers-min`, `--workers-max` — Ray resources
+
+Schedule uses Quartz 6-field cron: `SEC MIN HOUR DAY MONTH WEEKDAY` (use `?` for unspecified).
+Examples: `"0 0 * * * ?"` (every hour), `"0 */15 * * * ?"` (every 15 min), `"0 0 8 * * MON-FRI"` (weekdays at 8am).
 
 ### Storage Connectors
 ```bash
