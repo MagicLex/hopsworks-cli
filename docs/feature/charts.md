@@ -35,7 +35,7 @@ chart.url  =  HopsFS dataset path  (e.g. "Resources/charts/my_chart.html")
 
 ### Backend Bugs (workarounds in CLI)
 
-1. **NPE on null charts** — `DashboardDTO.getCharts().stream()` crashes if charts list is null. CLI always sends `"charts": []`. See `docs/hopsworks-ee-fixes.md` Fix 5a.
+1. **NPE on null charts** — `DashboardDTO.getCharts().stream()` crashes if charts list is null. CLI always sends `"charts": []`. See `docs/fixes/hopsworks-ee-fixes.md` Fix 5a.
 
 2. **NOT NULL layout columns** — `dashboard_chart.width/height/x/y` are non-nullable with no defaults. CLI defaults to width=12, height=8, x=0, y=0. See Fix 5b.
 
@@ -112,4 +112,4 @@ The Chart entity has a `job` field. The intended pattern is probably:
 3. UI could then offer "Run job to refresh" on each chart card
 
 ### Backend: Fix null guards + layout defaults
-See `docs/hopsworks-ee-fixes.md` Fix 5a/5b. Should be fixed upstream so clients don't need workarounds.
+See `docs/fixes/hopsworks-ee-fixes.md` Fix 5a/5b. Should be fixed upstream so clients don't need workarounds.

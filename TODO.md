@@ -21,7 +21,7 @@ Status: in progress
 - [x] `cmd/fg.go` — `hops fg stats <name> --compute` (trigger Spark job)
 - [x] FG recreated as DELTA (was HUDI, incompatible with 4.8 backend)
 - [x] JKS certs extracted to PEM at ~/.hopsfs_pems/
-- [x] SDK patches applied via user site-packages overlay (see docs/SDK-FIXES.md)
+- [x] SDK patches applied via user site-packages overlay (see docs/fixes/sdk-fixes.md)
 - [x] CLI sets PEMS_DIR + LIBHDFS_DEFAULT_USER on subprocess, removed except IndexError hack
 - [x] Fixed preview API parsing (row vs rows mismatch)
 - [x] `hops job status <name> [--wait] [--poll N]` — track materialization jobs
@@ -106,10 +106,10 @@ Status: in progress
 ---
 
 ## Known cluster issues
-- **RSS CRD missing** — apply `charts/spark/crds/uniffle.apache.org_remoteshuffleservices.yaml --server-side`, recreate from ConfigMap `rss-crd`, restart `rss-controller`. See `docs/CLUSTER-OPS.md`.
+- **RSS CRD missing** — apply `charts/spark/crds/uniffle.apache.org_remoteshuffleservices.yaml --server-side`, recreate from ConfigMap `rss-crd`, restart `rss-controller`. See `docs/reference/cluster-ops.md`.
 - **DDL migration missing** — `terminal_session.dev_mode` column not in DB. Applied manually: `ALTER TABLE terminal_session ADD COLUMN dev_mode TINYINT(1) DEFAULT 0;`
 - **Terminal JWT expiry** — tokens expire after ~8h, restart terminal session to refresh.
 - **API key scope** — current key lacks SERVING scope, blocks Python SDK login locally. Use terminal pod instead.
 
 ## Dev loop
-See `docs/DEV-LOOP.md`
+See `docs/dev-loop.md`

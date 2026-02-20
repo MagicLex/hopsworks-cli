@@ -159,12 +159,12 @@ python3 -c "import hsfs; print(hsfs.__file__)"
 
 **This is a temporary workaround.** The proper fix is:
 - Upstream PR to `logicalclocks/hopsworks-api` for the 2 SDK fixes
-- Terminal image rebuild to pre-extract PEM certs at pod boot (see `docs/hopsworks-ee-fixes.md`)
+- Terminal image rebuild to pre-extract PEM certs at pod boot (see `docs/fixes/hopsworks-ee-fixes.md`)
 
 ## Next Steps
 
 1. **PR to upstream** `logicalclocks/hopsworks-api` for the two SDK fixes
-2. **Update terminal image** to pre-extract PEM certs at startup (see `docs/hopsworks-ee-fixes.md`)
+2. **Update terminal image** to pre-extract PEM certs at startup (see `docs/fixes/hopsworks-ee-fixes.md`)
 
 ## Repos Cloned for Investigation
 

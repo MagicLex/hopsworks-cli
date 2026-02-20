@@ -54,7 +54,7 @@ else:
 
 System `hsfs` is root-owned. Fork's `main` depends on newer `hopsworks_common` (SinkJobConfiguration) — can't `pip install -e`.
 
-**Applied via user site-packages overlay** (see `docs/SDK-FIXES.md` for full details):
+**Applied via user site-packages overlay** (see `docs/fixes/sdk-fixes.md` for full details):
 - Copied system `hsfs` to `~/.local/lib/python3.11/site-packages/hsfs/`
 - Applied Fix 1 (feature_group.py) as a patch to the installed version copy
 - Applied Fix 2 (delta_engine.py) by copying the fork's file (installed == upstream/main)

@@ -69,7 +69,7 @@ Examples:
 
 		// Set env vars for hops-deltalake mTLS (PEM certs + HDFS user identity).
 		// PEMS_DIR must point to PEM files extracted from the pod's JKS keystores.
-		// See docs/SDK-FIXES.md for the full chain and why these are needed.
+		// See docs/fixes/sdk-fixes.md for the full chain and why these are needed.
 		pyCmd.Env = append(os.Environ(),
 			"PEMS_DIR="+os.ExpandEnv("${HOME}/.hopsfs_pems"),
 			"LIBHDFS_DEFAULT_USER="+os.Getenv("HADOOP_USER_NAME"),

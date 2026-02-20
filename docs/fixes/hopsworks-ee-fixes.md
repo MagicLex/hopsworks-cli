@@ -23,7 +23,7 @@ mkdir -p $PEMS_DIR
 
 # Extract from keystore → client_key.pem + client_cert.pem
 # Extract from truststore → ca_chain.pem
-# (exact conversion code exists in ~/hopsworks-cli/docs/SDK-FIXES.md)
+# (exact conversion code exists in ~/hopsworks-cli/docs/fixes/sdk-fixes.md)
 ```
 
 Then set env var on the terminal container:
