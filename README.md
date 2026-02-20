@@ -109,6 +109,27 @@ hops fg create-external sales_fg \
   --query "SELECT id, name, amount FROM sales" \
   --primary-key id
 
+# Jobs (full lifecycle)
+hops job list
+hops job create my_etl --type python --app-path Resources/jobs/etl.py
+hops job create spark_job --type pyspark --app-path "hdfs:///Projects/myproject/Resources/jobs/etl.py"
+hops job run my_etl --wait
+hops job logs my_etl
+hops job history my_etl
+hops job schedule my_etl "0 0 * * * ?"    # every hour (Quartz cron)
+hops job schedule-info my_etl
+hops job unschedule my_etl
+hops job stop my_etl
+hops job delete my_etl
+
+# Charts & Dashboards
+hops chart generate --fg orders --x status --type pie
+hops chart generate --fg orders --x category --y revenue --type bar --dashboard 1
+hops chart list
+hops dashboard list
+hops dashboard create "My Dashboard"
+hops dashboard add-chart 1 --chart 5
+
 # Context dump (for LLMs)
 hops context
 ```
@@ -127,7 +148,10 @@ hops context
 | `hops td list\|create\|compute\|read\|delete` | Training datasets (materialize + retrieve with splits) |
 | `hops model list\|info\|register\|download\|delete` | Model registry |
 | `hops deployment list\|info\|create\|start\|stop\|predict\|logs\|delete` | Model deployments (serving) |
-| `hops job list\|status` | Jobs (with `--wait` polling) |
+| `hops job list\|info\|create\|run\|stop\|status\|logs\|history\|delete` | Full job lifecycle (Python, PySpark, Spark, Ray) |
+| `hops job schedule\|schedule-info\|unschedule` | Cron scheduling (Quartz v2) |
+| `hops chart list\|info\|create\|update\|delete\|generate` | Charts (Plotly HTML from FG/FV data) |
+| `hops dashboard list\|info\|create\|delete\|add-chart\|remove-chart` | Dashboards (chart grid layout) |
 | `hops dataset list\|mkdir` | Browse project files |
 | `hops init` | Set up Claude Code integration |
 | `hops context` | Dump project state for LLMs |

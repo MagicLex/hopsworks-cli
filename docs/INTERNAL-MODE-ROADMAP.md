@@ -95,40 +95,24 @@ hops metrics alerts                 # Active Alertmanager alerts
 
 **Why:** Understanding why a job is slow, why a feature group isn't updating, or why a model serving endpoint is degraded — without leaving the terminal.
 
-### Phase 4: Job & Pipeline Operations (`hops run`)
+### Phase 4: Job & Pipeline Operations — DONE (v0.8.2)
 
+Full job lifecycle implemented via `hops job`:
 ```bash
-# Spark
-hops spark status                  # Running Spark apps
-hops spark logs <app-id>           # Spark driver/executor logs
-hops spark history [--app <id>]    # Spark History Server data
-hops spark submit <jar|py> [args]  # Submit Spark job
-
-# Airflow
-hops airflow dags                  # List DAGs
-hops airflow trigger <dag>         # Trigger DAG run
-hops airflow status <dag>          # DAG run status
-
-# Feature materialization
-hops fg materialize <name>         # Trigger offline materialization job
-hops fg materialize-online <name>  # Trigger online materialization
+hops job create/run/stop/status/logs/history/delete
+hops job schedule/schedule-info/unschedule
 ```
+Supports PYTHON, PYSPARK, SPARK (JAR), RAY. Cron scheduling via Quartz v2 API.
 
-**Why:** The full feature engineering loop — write features, materialize them, check jobs, debug failures — without switching to the Hopsworks UI.
+Airflow integration remains TODO.
 
-### Phase 5: Model Serving (`hops serve`)
+### Phase 5: Model Serving — DONE (v0.8.1)
 
+Full model + deployment lifecycle:
 ```bash
-hops model list                    # List models in registry
-hops model info <name>             # Model details, versions, artifacts
-hops deployment list               # List model deployments (KServe)
-hops deployment status <name>      # Deployment health, replicas, endpoint
-hops deployment logs <name>        # Inference server logs
-hops deployment predict <name> <json>  # Send prediction request
-hops deployment create <model> [--replicas N] [--resources ...]
+hops model list/info/register/download/delete
+hops deployment list/info/create/start/stop/predict/logs/delete
 ```
-
-**Why:** Completing the ML lifecycle — from features to model to deployment to prediction.
 
 ### Phase 6: Advanced Internal Operations
 

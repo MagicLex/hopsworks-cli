@@ -1,104 +1,75 @@
 # Dev Loop
 
-Two contexts: **local** (your laptop) and **internal** (Hopsworks terminal pod).
+We develop **inside** the Hopsworks cluster. Build, test, fix — same session.
 
-## 1. Code (local)
+## Setup
+
 ```bash
-# CLI changes
-vim cmd/fg.go
-go build -o hops .
-./hops fg list                    # quick local test via tunnel
+# CLI code lives here
+cd ~/hopsworks-cli
 
-# Backend changes (hopsworks-ee)
-export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
-cd /path/to/hopsworks-ee
-mvn clean install -P kube-cluster,remote-user-auth,kube,cloud -DskipTests
+# Binary goes here (aliased to `hops`)
+go build -o ~/hops-bin .
+alias hops=~/hops-bin
+
+# Always test as a real user would
+hops --version
+hops fg list
 ```
 
-## 2. Deploy backend (if backend changed)
+## Build + Test Cycle
+
 ```bash
-# Option A: Payara admin UI (reliable)
-kubectl port-forward -n hopsworks deployment/hopsworks-admin 4848:4848
-# Open https://localhost:4848, upload hopsworks-ear/target/hopsworks-ear.ear
+# 1. Edit code
+vim cmd/job.go
 
-# Option B: script (needs stable SSH)
-./scripts/kube_redeploy_ear.sh
-```
-**DO NOT** `kubectl rollout restart` after hot redeploy — reloads from Docker image.
+# 2. Build
+go build -o ~/hops-bin .
 
-## 3. Test locally (via SSH tunnel)
-```bash
-# Open tunnel (one-time)
-ssh -f -N -L 8443:172.20.153.241:443 lex@dev0.devnet.hops.works
+# 3. Test live against the cluster
+hops job create testjob --type python --app-path Resources/jobs/test.py
+hops job run testjob --wait
+hops job logs testjob
+hops job delete testjob
 
-# Requires /etc/hosts: 127.0.0.1 hopsworks.ai.local
-# Config: ~/.hops/config → host: https://hopsworks.ai.local:8443
-
-./hops fg list
-./hops fg stats customer_transactions
-```
-Local testing covers: all REST operations (list, info, create, delete, stats).
-Local testing CANNOT do: `fg insert` (needs Python SDK), anything needing Kafka.
-
-## 4. Publish CLI
-```bash
-# Build both platforms
-GOOS=linux GOARCH=amd64 go build -o hops-linux-amd64 .
-GOOS=darwin GOARCH=arm64 go build -o hops-darwin-arm64 .
-
-# Commit + push
-git add . && git commit -m "feat: ..." && git push origin main
-
-# Release (or update existing)
-gh release create vX.Y.Z ./hops-linux-amd64 ./hops-darwin-arm64 --title "vX.Y.Z - ..."
-# or update:
-gh release upload vX.Y.Z ./hops-linux-amd64 ./hops-darwin-arm64 --clobber
-
-# Note: gh CLI isn't installed in terminal pod. Git credentials work for push
-# but lack read:org scope for gh auth. Use GitHub REST API with curl instead:
-#   TOKEN=$(cat ~/.git-credentials | head -1 | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
-#   curl -X POST "https://api.github.com/repos/MagicLex/hopsworks-cli/releases" \
-#     -H "Authorization: token $TOKEN" -d '{"tag_name":"vX.Y.Z",...}'
+# 4. If it works, commit
+git add cmd/job.go pkg/client/job.go
+git commit -m "feat: add job create command"
 ```
 
-## 5. Test from Hopsworks terminal (internal mode)
-Open terminal from Hopsworks UI, then:
+## Backend Access
+
+We have full access to backend/API source and can kubectl the cluster:
+
 ```bash
-# First time
-curl -L https://github.com/MagicLex/hopsworks-cli/releases/download/vX.Y.Z/hops-linux-amd64 -o ~/hops
-chmod +x ~/hops
+# Backend source (Java)
+ls ~/hopsworks-ee
 
-# After a release update
-~/hops update
+# API/SDK source (Python)
+ls ~/hopsworks-api
 
-# Internal mode is auto-detected (REST_ENDPOINT + SECRETS_DIR set)
-# No config needed — JWT + project auto-discovered
-~/hops fg list
-~/hops fg insert customer_transactions --generate 50   # needs Python SDK (available here)
-~/hops job status customer_transactions_1_offline_fg_materialization --wait  # poll until done
-~/hops fg preview customer_transactions                 # verify data landed
-~/hops fg stats customer_transactions --compute         # triggers Spark job
-~/hops fg stats customer_transactions                   # view results
+# Kubernetes
+kubectl get pods -n hopsworks
+kubectl logs -n hopsworks <pod>
 ```
-Internal testing covers: everything, including `fg insert` (Python SDK available), Spark jobs, Kafka writes.
 
-**Terminal JWT expires after ~8h** — close and reopen terminal session to refresh.
+If a backend fix is needed:
+1. Make the fix
+2. Document in the appropriate `docs/*.md` (e.g. `hopsworks-ee-fixes.md`)
+3. Port upstream later
+4. **No untracked monkey patches**
 
-## What to test where
+## What's Available
 
-| Operation | Local (tunnel) | Internal (terminal) |
-|-----------|:-:|:-:|
-| fg list/info/features/preview | yes | yes |
-| fg create/delete | yes | yes |
-| fg stats (read) | yes | yes |
-| fg stats --compute | yes | yes |
-| fg insert | no | yes |
-| fv/td operations | yes | yes |
-| connector list | yes | yes |
+- Go compiler, Python 3.11, pip
+- kubectl with edit access to `hopsworks` + `lexterm` namespaces
+- HopsFS via FUSE mount at `/hopsfs/`
+- Hopsworks REST API (auto-authenticated via JWT)
+- Python SDK (`import hopsworks; project = hopsworks.login()`)
 
-## Typical flow
-1. Code + build locally
-2. Quick test via tunnel (`fg list`, `fg stats`, etc.)
-3. If it works, commit + push + release
-4. Pull in terminal pod, test insert/compute operations
-5. If backend change needed: build EAR, redeploy, repeat
+## Rules
+
+- Always use `hops` (the alias), not `~/hops-bin`
+- Clean up temp files after testing
+- Document everything — findings, quirks, fixes
+- Test like a real user would
