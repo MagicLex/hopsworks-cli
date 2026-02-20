@@ -117,3 +117,34 @@ Both fixes are deployed as a ConfigMap mount on the ArrowFlight deployment:
 # Remove volume mounts from deployment, then:
 kubectl -n hopsworks delete configmap arrowflight-query-engine-patch
 ```
+
+## Fix 5: Dashboard API — null charts NPE + non-nullable layout columns
+
+**Problem**: Two issues in the Dashboard/Chart API:
+
+### Bug 5a: `DashboardDTO.getCharts()` NPE on null charts
+`DashboardController.createDashboard()` and `updateDashboard()` call `.getCharts().stream()` which NPEs if the charts list is null (e.g. when creating a dashboard without specifying charts).
+
+**File**: `DashboardController.java`, line 56
+**Workaround**: CLI always sends `"charts": []` (never omits or sends null).
+**Proper fix**: Add null guard in `updateDashboard()`:
+```java
+List<ChartDTO> charts = dashboardDTO.getCharts();
+if (charts == null) {
+    charts = Collections.emptyList();
+}
+```
+
+### Bug 5b: `dashboard_chart` layout columns are NOT NULL but no defaults
+`DashboardChart` entity has `@Basic(optional = false)` on `width`, `height`, `x`, `y`. When a chart is added to a dashboard without explicit layout values, the `ChartDTO` fields are null → JPA constraint violation → transaction rollback.
+
+**File**: `DashboardChart.java`, lines 51-65
+**Workaround**: CLI defaults width=12, height=8, x=0, y=0 when adding charts.
+**Proper fix**: Either set defaults in `DashboardController.updateDashboard()`:
+```java
+dashboardChart.setWidth(chartDto.getWidth() != null ? chartDto.getWidth() : 12);
+dashboardChart.setHeight(chartDto.getHeight() != null ? chartDto.getHeight() : 8);
+dashboardChart.setX(chartDto.getX() != null ? chartDto.getX() : 0);
+dashboardChart.setY(chartDto.getY() != null ? chartDto.getY() : 0);
+```
+Or make the DB columns nullable / add column defaults in the migration.
