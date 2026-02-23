@@ -43,6 +43,13 @@ type StorageConnector struct {
 	Region       string `json:"region,omitempty"`
 	IamRole      string `json:"iamRole,omitempty"`
 	SessionToken string `json:"sessionToken,omitempty"`
+	// BigQuery
+	KeyPath                string `json:"keyPath,omitempty"`
+	ParentProject          string `json:"parentProject,omitempty"`
+	Dataset                string `json:"dataset,omitempty"`
+	QueryProject           string `json:"queryProject,omitempty"`
+	QueryTable             string `json:"queryTable,omitempty"`
+	MaterializationDataset string `json:"materializationDataset,omitempty"`
 }
 
 // DataSource represents a browseable data source location (database/schema/table).
@@ -96,8 +103,11 @@ func (c *Client) ListStorageConnectors() ([]StorageConnector, error) {
 	var list struct {
 		Items []StorageConnector `json:"items"`
 	}
-	if err := json.Unmarshal(data, &list); err == nil && list.Items != nil {
-		return list.Items, nil
+	if err := json.Unmarshal(data, &list); err == nil {
+		if list.Items != nil {
+			return list.Items, nil
+		}
+		return []StorageConnector{}, nil
 	}
 
 	// Try direct array

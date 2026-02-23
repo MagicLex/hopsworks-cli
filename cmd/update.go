@@ -71,6 +71,9 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
+	// Remove destination first to avoid "text file busy" when overwriting a running binary.
+	// Linux allows unlinking open files — the old inode stays alive for the running process.
+	_ = os.Remove(dst)
 	return os.WriteFile(dst, data, 0755)
 }
 

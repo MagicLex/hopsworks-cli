@@ -4,7 +4,7 @@
 
 A `hops` CLI in Go that works for humans and LLMs. No MCP server needed — just `Bash(hops *)`.
 
-## Current State (v0.8.2)
+## Current State (v0.8.5)
 
 ### Commands Implemented
 

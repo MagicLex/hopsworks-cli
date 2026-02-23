@@ -53,8 +53,11 @@ func (c *Client) ListCharts() ([]Chart, error) {
 	var list struct {
 		Items []Chart `json:"items"`
 	}
-	if err := json.Unmarshal(data, &list); err == nil && list.Items != nil {
-		return list.Items, nil
+	if err := json.Unmarshal(data, &list); err == nil {
+		if list.Items != nil {
+			return list.Items, nil
+		}
+		return []Chart{}, nil
 	}
 
 	var charts []Chart
@@ -129,8 +132,11 @@ func (c *Client) ListDashboards() ([]Dashboard, error) {
 	var list struct {
 		Items []Dashboard `json:"items"`
 	}
-	if err := json.Unmarshal(data, &list); err == nil && list.Items != nil {
-		return list.Items, nil
+	if err := json.Unmarshal(data, &list); err == nil {
+		if list.Items != nil {
+			return list.Items, nil
+		}
+		return []Dashboard{}, nil
 	}
 
 	var dashboards []Dashboard

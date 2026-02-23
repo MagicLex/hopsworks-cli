@@ -36,8 +36,11 @@ func (c *Client) ListTransformationFunctions() ([]TransformationFunction, error)
 	}
 
 	var tfList TransformationFunctionList
-	if err := json.Unmarshal(data, &tfList); err == nil && tfList.Items != nil {
-		return tfList.Items, nil
+	if err := json.Unmarshal(data, &tfList); err == nil {
+		if tfList.Items != nil {
+			return tfList.Items, nil
+		}
+		return []TransformationFunction{}, nil
 	}
 
 	var tfs []TransformationFunction

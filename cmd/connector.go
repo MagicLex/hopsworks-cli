@@ -33,6 +33,13 @@ var (
 	connS3Region       string
 	connS3Path         string
 	connS3SessionToken string
+	// BigQuery
+	connBQKeyPath       string
+	connBQParentProject string
+	connBQDataset       string
+	connBQQueryProject  string
+	connBQQueryTable    string
+	connBQMatDataset    string
 	// Common
 	connDescription string
 	// Browse flags
@@ -144,6 +151,23 @@ var connectorInfoCmd = &cobra.Command{
 			}
 			if sc.IamRole != "" {
 				output.Info("IAM Role: %s", sc.IamRole)
+			}
+		case "BIGQUERY":
+			output.Info("Parent Project: %s", sc.ParentProject)
+			if sc.KeyPath != "" {
+				output.Info("Key Path: %s", sc.KeyPath)
+			}
+			if sc.Dataset != "" {
+				output.Info("Dataset: %s", sc.Dataset)
+			}
+			if sc.QueryProject != "" {
+				output.Info("Query Project: %s", sc.QueryProject)
+			}
+			if sc.QueryTable != "" {
+				output.Info("Query Table: %s", sc.QueryTable)
+			}
+			if sc.MaterializationDataset != "" {
+				output.Info("Materialization Dataset: %s", sc.MaterializationDataset)
 			}
 		}
 
@@ -349,7 +373,7 @@ var connectorDeleteCmd = &cobra.Command{
 
 var connectorCreateCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Create a storage connector (use subcommand: snowflake, jdbc, s3)",
+	Short: "Create a storage connector (use subcommand: snowflake, jdbc, s3, bigquery)",
 }
 
 // --- Create Snowflake ---
@@ -542,6 +566,78 @@ Examples:
 	},
 }
 
+// --- Create BigQuery ---
+
+var connectorCreateBigQueryCmd = &cobra.Command{
+	Use:   "bigquery <name>",
+	Short: "Create a BigQuery storage connector",
+	Long: `Create a BigQuery storage connector.
+
+The key file must already be uploaded to HopsFS (e.g. /Projects/<project>/Resources/key.json).
+Use "hops fs upload" or copy it to /hopsfs/Resources/ first.
+
+Examples:
+  # With materialization dataset (most common)
+  hops connector create bigquery my_bq \
+    --key-path Resources/bq-key.json \
+    --parent-project hops-20 \
+    --materialization-dataset my_views
+
+  # With explicit query target
+  hops connector create bigquery my_bq \
+    --key-path Resources/bq-key.json \
+    --parent-project hops-20 \
+    --query-project hops-20 --dataset my_dataset --query-table my_table`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if connBQKeyPath == "" {
+			return fmt.Errorf("--key-path is required (HDFS path to service account JSON)")
+		}
+		if connBQParentProject == "" {
+			return fmt.Errorf("--parent-project is required (GCP project ID)")
+		}
+		// Validate: either (queryProject+dataset+queryTable) or materializationDataset
+		hasQuery := connBQQueryProject != "" || connBQDataset != "" || connBQQueryTable != ""
+		hasMat := connBQMatDataset != ""
+		if !hasQuery && !hasMat {
+			return fmt.Errorf("--materialization-dataset or --query-project/--dataset/--query-table is required")
+		}
+		if hasQuery && (connBQQueryProject == "" || connBQDataset == "" || connBQQueryTable == "") {
+			return fmt.Errorf("--query-project, --dataset, and --query-table must all be provided together")
+		}
+
+		c, err := mustClient()
+		if err != nil {
+			return err
+		}
+
+		sc := &client.StorageConnector{
+			Type:                   "featurestoreBigqueryConnectorDTO",
+			Name:                   args[0],
+			Description:            connDescription,
+			StorageConnectorType:   "BIGQUERY",
+			KeyPath:                connBQKeyPath,
+			ParentProject:          connBQParentProject,
+			Dataset:                connBQDataset,
+			QueryProject:           connBQQueryProject,
+			QueryTable:             connBQQueryTable,
+			MaterializationDataset: connBQMatDataset,
+		}
+
+		created, err := c.CreateStorageConnector(sc)
+		if err != nil {
+			return err
+		}
+
+		if output.JSONMode {
+			output.PrintJSON(created)
+			return nil
+		}
+		output.Success("Created BigQuery connector '%s' (ID: %d)", created.Name, created.ID)
+		return nil
+	},
+}
+
 // --- Registration ---
 
 func init() {
@@ -604,4 +700,14 @@ func init() {
 	connectorCreateS3Cmd.Flags().StringVar(&connS3SessionToken, "session-token", "", "Temporary session token")
 	connectorCreateS3Cmd.Flags().StringVar(&connDescription, "description", "", "Connector description")
 	connectorCreateCmd.AddCommand(connectorCreateS3Cmd)
+
+	// Create BigQuery
+	connectorCreateBigQueryCmd.Flags().StringVar(&connBQKeyPath, "key-path", "", "HDFS path to service account key JSON")
+	connectorCreateBigQueryCmd.Flags().StringVar(&connBQParentProject, "parent-project", "", "GCP project ID")
+	connectorCreateBigQueryCmd.Flags().StringVar(&connBQDataset, "dataset", "", "BigQuery dataset")
+	connectorCreateBigQueryCmd.Flags().StringVar(&connBQQueryProject, "query-project", "", "Query project")
+	connectorCreateBigQueryCmd.Flags().StringVar(&connBQQueryTable, "query-table", "", "Query table")
+	connectorCreateBigQueryCmd.Flags().StringVar(&connBQMatDataset, "materialization-dataset", "", "Materialization dataset")
+	connectorCreateBigQueryCmd.Flags().StringVar(&connDescription, "description", "", "Connector description")
+	connectorCreateCmd.AddCommand(connectorCreateBigQueryCmd)
 }

@@ -29,8 +29,11 @@ func (c *Client) ListTrainingDatasets(fvName string, fvVersion int) ([]TrainingD
 	}
 
 	var tdList TrainingDatasetList
-	if err := json.Unmarshal(data, &tdList); err == nil && tdList.Items != nil {
-		return tdList.Items, nil
+	if err := json.Unmarshal(data, &tdList); err == nil {
+		if tdList.Items != nil {
+			return tdList.Items, nil
+		}
+		return []TrainingDataset{}, nil
 	}
 
 	var tds []TrainingDataset

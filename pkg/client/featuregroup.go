@@ -70,10 +70,13 @@ func (c *Client) ListFeatureGroups() ([]FeatureGroup, error) {
 		return nil, err
 	}
 
-	// The API might return a list or a wrapped object
+	// The API might return a wrapped object {items:[...]}, an empty object {}, or a direct array
 	var fgList FeatureGroupList
-	if err := json.Unmarshal(data, &fgList); err == nil && fgList.Items != nil {
-		return fgList.Items, nil
+	if err := json.Unmarshal(data, &fgList); err == nil {
+		if fgList.Items != nil {
+			return fgList.Items, nil
+		}
+		return []FeatureGroup{}, nil
 	}
 
 	// Try as direct array
