@@ -52,7 +52,7 @@ Examples:
 
 		script := buildModelRegisterScript(name, path)
 		if err := runPython(script); err != nil {
-			return fmt.Errorf("model registration failed: %w", err)
+			return fmt.Errorf("register model: %w", err)
 		}
 		return nil
 	},
@@ -227,7 +227,7 @@ Examples:
 
 		script := buildModelDownloadScript(name)
 		if err := runPython(script); err != nil {
-			return fmt.Errorf("model download failed: %w", err)
+			return fmt.Errorf("download model: %w", err)
 		}
 		return nil
 	},

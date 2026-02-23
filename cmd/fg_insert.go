@@ -76,7 +76,7 @@ Examples:
 		)
 
 		if err := pyCmd.Run(); err != nil {
-			return fmt.Errorf("insertion failed: %w", err)
+			return fmt.Errorf("insert into feature group: %w", err)
 		}
 
 		if output.JSONMode {

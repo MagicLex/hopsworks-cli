@@ -67,6 +67,20 @@ If a backend fix is needed:
 - Hopsworks REST API (auto-authenticated via JWT)
 - Python SDK (`import hopsworks; project = hopsworks.login()`)
 
+## Error Format Convention
+
+All `fmt.Errorf()` messages follow these patterns (Go convention: lowercase, no trailing period):
+
+| Category | Pattern | Example |
+|----------|---------|---------|
+| Missing flag | `--flag is required` | `--url is required` |
+| Not found | `<thing> '<name>' not found: %w` | `feature group 'fg1' not found: %w` |
+| Operation | `<verb> <noun>: %w` | `register model: %w` |
+| Invalid input | `invalid <thing>: <detail>` | `invalid chart ID: abc` |
+| Conditional | `--flag-a or --flag-b is required` | `--password or --token is required` |
+
+**Never**: `"X failed: %w"`, `"failed to X: %w"`, `"could not X: %w"`, capitalized starts, trailing periods.
+
 ## Rules
 
 - Always use `hops` (the alias), not `~/hops-bin`

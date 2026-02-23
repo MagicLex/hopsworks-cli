@@ -105,7 +105,7 @@ Examples:
 
 		script := buildFVGetScript(args[0], ver, fvGetEntries, output.JSONMode)
 		if err := runPython(script); err != nil {
-			return fmt.Errorf("feature vector lookup failed: %w", err)
+			return fmt.Errorf("get feature vector: %w", err)
 		}
 		return nil
 	},
@@ -183,7 +183,7 @@ Examples:
 
 		script := buildFVReadScript(args[0], ver, fvReadOutput, fvReadN, output.JSONMode)
 		if err := runPython(script); err != nil {
-			return fmt.Errorf("batch read failed: %w", err)
+			return fmt.Errorf("read batch: %w", err)
 		}
 		return nil
 	},

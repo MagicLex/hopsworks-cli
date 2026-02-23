@@ -364,7 +364,15 @@ hops connector create jdbc <name> \
 hops connector create s3 <name> \
   --bucket <bucket> --access-key <ak> --secret-key <sk> \
   [--region <region>] [--iam-role <arn>] [--path <prefix>] [--description <text>]
+
+# BigQuery
+hops connector create bigquery <name> \
+  --key-path <hdfs-path-to-key.json> --parent-project <gcp-project-id> \
+  --materialization-dataset <dataset> [--description <text>]
+  # OR with explicit query target:
+  --query-project <proj> --dataset <ds> --query-table <tbl>
 ```
+The key file must be uploaded to HopsFS first (e.g. `/Projects/<project>/Resources/key.json`).
 
 #### External Feature Groups
 ```bash

@@ -30,7 +30,7 @@ var updateCmd = &cobra.Command{
 		goInstall.Stdout = os.Stdout
 		goInstall.Stderr = os.Stderr
 		if err := goInstall.Run(); err != nil {
-			return fmt.Errorf("go install failed: %w", err)
+			return fmt.Errorf("go install: %w", err)
 		}
 
 		// go install puts the binary as "hopsworks-cli" in GOPATH/bin

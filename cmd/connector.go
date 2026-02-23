@@ -196,7 +196,7 @@ var connectorTestCmd = &cobra.Command{
 		// Try listing databases as a connection test
 		dbs, err := c.GetConnectorDatabases(args[0])
 		if err != nil {
-			return fmt.Errorf("connection test failed for %s (%s): %w", sc.Name, sc.StorageConnectorType, err)
+			return fmt.Errorf("test connector '%s' (%s): %w", sc.Name, sc.StorageConnectorType, err)
 		}
 
 		if output.JSONMode {

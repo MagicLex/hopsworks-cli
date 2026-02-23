@@ -80,7 +80,7 @@ Examples:
 		script := buildChartGenerateScript(source, chartGenFG != "", chartGenX, chartGenY, chartGenType, title, chartGenN, chartGenVersion)
 		raw, err := runPythonCapture(script)
 		if err != nil {
-			return fmt.Errorf("chart generation failed: %w", err)
+			return fmt.Errorf("generate chart: %w", err)
 		}
 
 		// Parse JSON result — SDK prints login/progress to stdout, so extract the JSON line

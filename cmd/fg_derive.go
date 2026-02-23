@@ -167,7 +167,7 @@ Examples:
 		)
 
 		if err := pyCmd.Run(); err != nil {
-			return fmt.Errorf("derive failed: %w", err)
+			return fmt.Errorf("derive feature group: %w", err)
 		}
 
 		if output.JSONMode {

@@ -48,12 +48,12 @@ var loginCmd = &cobra.Command{
 
 		data, err := c.Get("/hopsworks-api/api/project")
 		if err != nil {
-			return fmt.Errorf("authentication failed: %w", err)
+			return fmt.Errorf("authenticate: %w", err)
 		}
 
 		var projects []json.RawMessage
 		if err := json.Unmarshal(data, &projects); err != nil {
-			return fmt.Errorf("unexpected response: %w", err)
+			return fmt.Errorf("parse response: %w", err)
 		}
 
 		// Save config

@@ -106,10 +106,10 @@ Examples:
 			}
 			result, err := c.GetConnectorData(fgExtConnector, ds)
 			if err != nil {
-				return fmt.Errorf("could not infer schema: %w", err)
+				return fmt.Errorf("infer schema: %w", err)
 			}
 			if len(result.Features) == 0 {
-				return fmt.Errorf("no features returned from connector — use --features to specify schema manually")
+				return fmt.Errorf("no features returned from connector, use --features to specify schema manually")
 			}
 
 			// Parse query to find which columns are selected (handles SELECT col1, col2 FROM ...)
@@ -152,7 +152,7 @@ Examples:
 		pyCmd.Env = os.Environ()
 
 		if err := pyCmd.Run(); err != nil {
-			return fmt.Errorf("create external feature group failed: %w", err)
+			return fmt.Errorf("create external feature group: %w", err)
 		}
 
 		if output.JSONMode {

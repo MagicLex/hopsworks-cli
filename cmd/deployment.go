@@ -131,7 +131,7 @@ Examples:
 		// Resolve model version
 		m, err := c.GetModel(modelName, deployVersion)
 		if err != nil {
-			return fmt.Errorf("model not found: %w", err)
+			return fmt.Errorf("model '%s' not found: %w", modelName, err)
 		}
 
 		name := deployName

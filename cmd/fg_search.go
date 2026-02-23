@@ -47,7 +47,7 @@ Examples:
 
 		script := buildSearchScript(fg.Name, fg.Version, fgSearchVector, fgSearchK, fgSearchCol, output.JSONMode)
 		if err := runPython(script); err != nil {
-			return fmt.Errorf("similarity search failed: %w", err)
+			return fmt.Errorf("similarity search: %w", err)
 		}
 		return nil
 	},

@@ -147,7 +147,7 @@ Examples:
 
 		script := buildTDComputeScript(args[0], fvVer, tdComputeFormat, tdComputeDesc, tdComputeSplit)
 		if err := runPython(script); err != nil {
-			return fmt.Errorf("training data materialization failed: %w", err)
+			return fmt.Errorf("materialize training data: %w", err)
 		}
 		return nil
 	},
@@ -258,7 +258,7 @@ Examples:
 
 		script := buildTDReadScript(args[0], fvVer, tdReadVersion, tdReadOutput, tdReadSplit, output.JSONMode)
 		if err := runPython(script); err != nil {
-			return fmt.Errorf("training data read failed: %w", err)
+			return fmt.Errorf("read training data: %w", err)
 		}
 		return nil
 	},
@@ -359,7 +359,7 @@ Examples:
 			script := buildTDStatsComputeScript(args[0], fvVer, tdStatsVersion)
 			rawOutput, err := runPythonCapture(script)
 			if err != nil {
-				return fmt.Errorf("statistics computation failed: %w", err)
+				return fmt.Errorf("compute statistics: %w", err)
 			}
 			// Extract JSON object from output (skip SDK log lines)
 			statsJSON := extractJSON(rawOutput)
@@ -368,7 +368,7 @@ Examples:
 			}
 			// Register via Go client
 			if err := c.RegisterTrainingDatasetStatistics(args[0], fvVer, tdStatsVersion, statsJSON); err != nil {
-				return fmt.Errorf("failed to register statistics: %w", err)
+				return fmt.Errorf("register statistics: %w", err)
 			}
 			if !output.JSONMode {
 				output.Success("Statistics computed and registered for '%s' v%d TD v%d", args[0], fvVer, tdStatsVersion)
