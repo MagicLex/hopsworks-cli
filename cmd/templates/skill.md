@@ -288,7 +288,9 @@ class Predict:
 - Predictor script → `/mnt/artifacts/predictor-<script>.py`
 - Model files (from `Models/<name>/<version>/Files/`) → `/mnt/models/`
 
-**Updating a deployment**: `start`/`stop` does NOT refresh the predictor script or model files. You must `delete` then `create` a new deployment to pick up changes.
+**Updating a deployment**:
+- **Model version swap**: Update in-place via SDK — `deployment.model_version = N; deployment.save()` triggers a rolling update with zero downtime.
+- **Predictor script changes**: Must `delete` then `create` a new deployment — `start`/`stop` does not refresh scripts.
 
 #### Typical Deploy Flow
 ```bash
@@ -408,6 +410,44 @@ Flags:
 - `--event-time <col>`, `--online`, `--description <text>` — optional
 
 **Snowflake note**: Use UPPERCASE column names in `--query` and `--features`. Snowflake identifiers are case-sensitive and default to uppercase.
+
+### Charts
+```bash
+hops chart list                           # List all charts
+hops chart info <id>                      # Show chart details
+hops chart generate --fg <name> --x <col> --type <type>  # Generate from FG data
+hops chart generate --fv <name> --x <col> --y <col> --type bar --dashboard <id>
+hops chart create <title> --url <url> --description <desc>  # Register external chart
+hops chart update <id> --title <new-title>
+hops chart delete <id>                    # Delete chart
+```
+Chart types: `bar`, `line`, `scatter`, `histogram`, `pie`
+
+Flags for generate:
+- `--fg <name>` or `--fv <name>` — data source (required, one of)
+- `--x <col>` — X-axis / category column (required)
+- `--y <col>` — Y-axis / value column (optional, depends on chart type)
+- `--type <type>` — chart type (default: bar)
+- `--n <rows>` — row limit (0 = all)
+- `--title <text>` — chart title (auto-generated if omitted)
+- `--dashboard <id>` — auto-add to dashboard with grid layout
+- `--version <n>` — FG/FV version
+
+### Dashboards
+```bash
+hops dashboard list                       # List all dashboards
+hops dashboard info <id>                  # Show dashboard with chart layout
+hops dashboard create <name>              # Create empty dashboard
+hops dashboard add-chart <id> --chart-id <id>  # Add chart to dashboard
+hops dashboard remove-chart <id> --chart-id <id>  # Remove chart
+hops dashboard delete <id>               # Delete dashboard
+```
+Alias: `hops dash list`, etc.
+
+Flags for add-chart:
+- `--chart-id <id>` — chart to add (required)
+- `--width <n>`, `--height <n>` — size in grid units (default: 12x8)
+- `--x <n>`, `--y <n>` — position in grid
 
 ### Other
 ```bash

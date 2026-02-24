@@ -76,3 +76,61 @@ This means HUDI offline writes (which need a Spark job) cannot run from the term
 ### Workaround
 
 Use `--online-only` flag for inserts, or trigger materialization jobs from the Hopsworks UI/Jobs page where Spark is available.
+
+---
+
+## ISSUE-3: Brewer serving record required for chart/dashboard UI
+
+**Status:** Workaround applied
+**Severity:** Low — UI-only coupling
+
+### Problem
+
+The frontend gates the "Add Dashboard" button behind `brewer_enabled` setting (`Dashboards/index.tsx` lines 61-69). When `brewer_enabled=true` (needed for dashboard UI), the backend's `ChatController.getProjectBrewerServing()` looks for a serving record named `brewer` in the project. If missing, it throws:
+
+```
+Serving for LLM Assistant in <project> not found
+```
+
+This error appears in the UI even though charts/dashboards have zero backend dependency on Brewer.
+
+### Root cause
+
+Frontend coupling in `hopsworks-front/src/pages/project/view/Dashboards/index.tsx`:
+```typescript
+const { data: brewerEnabled } = useGetBoolVariableQuery('brewer_enabled');
+{brewerEnabled && (<Button>+ Add Dashboard</Button>)}
+```
+
+Backend lookup in `ChatController.java` (line 188-196):
+```java
+Serving serving = servingFacade.findByProjectAndName(project, settings.getString(BREWER_SERVING_NAME));
+if (serving == null) throw new BrewerException(BREWER_WORKER_NOT_FOUND, ...);
+```
+
+### Workaround
+
+Create a stopped stub deployment named `brewer` via the CLI:
+```bash
+# 1. Register a dummy model
+mkdir /tmp/brewer_stub && echo '{}' > /tmp/brewer_stub/model.json
+cat > /tmp/brewer_stub/predict.py << 'EOF'
+class Predict:
+    def __init__(self): pass
+    def predict(self, inputs): return {"predictions": []}
+EOF
+hops model register brewerstub /tmp/brewer_stub --framework python --description "Stub for brewer serving record"
+cp /tmp/brewer_stub/predict.py /hopsfs/Models/brewerstub/1/Files/predict.py
+
+# 2. Create deployment (don't start it)
+hops deployment create brewerstub --script predict.py --name brewer
+
+# 3. Clean up
+rm -rf /tmp/brewer_stub
+```
+
+The serving record satisfies the DB lookup. Dashboard UI is unblocked. Brewer chat won't work (no actual LLM worker) but that's fine.
+
+### Proper fix
+
+Decouple the frontend: remove the `brewerEnabled` gate from the dashboard "Add" button. Charts/dashboards are independent backend features.

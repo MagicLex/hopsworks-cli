@@ -135,6 +135,14 @@ Examples:
 				return fmt.Errorf("get dashboard %d: %w", chartGenDashboard, err)
 			}
 
+			// Auto-layout: 2 columns, each chart 6x4 grid units
+			cols := 2
+			idx := len(d.Charts)
+			created.Width = 6
+			created.Height = 4
+			created.X = (idx % cols) * 6
+			created.Y = (idx / cols) * 4
+
 			d.Charts = append(d.Charts, *created)
 
 			updated, err := c.UpdateDashboard(chartGenDashboard, d)
