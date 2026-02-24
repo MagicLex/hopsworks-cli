@@ -119,9 +119,12 @@ var tdDeleteCmd = &cobra.Command{
 // --- td compute ---
 
 var (
-	tdComputeDesc   string
-	tdComputeFormat string
-	tdComputeSplit  string
+	tdComputeDesc      string
+	tdComputeFormat    string
+	tdComputeSplit     string
+	tdComputeFilter    string
+	tdComputeStartTime string
+	tdComputeEndTime   string
 )
 
 var tdComputeCmd = &cobra.Command{
@@ -133,6 +136,9 @@ Examples:
   hops td compute my_view 1
   hops td compute my_view 1 --format csv
   hops td compute my_view 1 --split "train:0.8,test:0.2"
+  hops td compute my_view 1 --filter "price > 100"
+  hops td compute my_view 1 --filter "price > 50 AND product == Laptop"
+  hops td compute my_view 1 --start-time "2026-01-01" --end-time "2026-02-01"
   hops td compute my_view 1 --description "v1 training set"`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -145,7 +151,7 @@ Examples:
 			output.Info("Materializing training data from '%s' v%d...", args[0], fvVer)
 		}
 
-		script := buildTDComputeScript(args[0], fvVer, tdComputeFormat, tdComputeDesc, tdComputeSplit)
+		script := buildTDComputeScript(args[0], fvVer, tdComputeFormat, tdComputeDesc, tdComputeSplit, tdComputeFilter, tdComputeStartTime, tdComputeEndTime)
 		if err := runPython(script); err != nil {
 			return fmt.Errorf("materialize training data: %w", err)
 		}
@@ -153,9 +159,30 @@ Examples:
 	},
 }
 
-func buildTDComputeScript(fvName string, fvVer int, format, desc, split string) string {
+func buildTDComputeScript(fvName string, fvVer int, format, desc, split, filter, startTime, endTime string) string {
 	var sb strings.Builder
 	sb.WriteString(buildFVPreamble(fvName, fvVer))
+
+	// Build extra_filter from --filter flag
+	if filter != "" {
+		sb.WriteString(buildFilterSnippet(filter))
+	}
+
+	// Common kwargs for all create methods
+	var kwargs []string
+	kwargs = append(kwargs, fmt.Sprintf("data_format=%q", format))
+	kwargs = append(kwargs, fmt.Sprintf("description=%q", desc))
+	if startTime != "" {
+		kwargs = append(kwargs, fmt.Sprintf("start_time=%q", startTime))
+	}
+	if endTime != "" {
+		kwargs = append(kwargs, fmt.Sprintf("end_time=%q", endTime))
+	}
+	if filter != "" {
+		kwargs = append(kwargs, "extra_filter=extra_filter")
+	}
+	kwargs = append(kwargs, `write_options={"wait_for_job": False}`)
+	kwargsStr := strings.Join(kwargs, ",\n    ")
 
 	if split != "" {
 		// Parse split spec: "train:0.8,test:0.2" or "train:0.7,validation:0.15,test:0.15"
@@ -166,29 +193,23 @@ func buildTDComputeScript(fvName string, fvVer int, format, desc, split string) 
 td_version, job = fv.create_train_validation_test_split(
     validation_size=%.4f,
     test_size=%.4f,
-    data_format=%q,
-    description=%q,
-    write_options={"wait_for_job": False},
+    %s,
 )
-`, valSize, testSize, format, desc))
+`, valSize, testSize, kwargsStr))
 		} else {
 			sb.WriteString(fmt.Sprintf(`
 td_version, job = fv.create_train_test_split(
     test_size=%.4f,
-    data_format=%q,
-    description=%q,
-    write_options={"wait_for_job": False},
+    %s,
 )
-`, testSize, format, desc))
+`, testSize, kwargsStr))
 		}
 	} else {
 		sb.WriteString(fmt.Sprintf(`
 td_version, job = fv.create_training_data(
-    data_format=%q,
-    description=%q,
-    write_options={"wait_for_job": False},
+    %s,
 )
-`, format, desc))
+`, kwargsStr))
 	}
 
 	sb.WriteString(`
@@ -201,6 +222,104 @@ else:
 `)
 
 	return sb.String()
+}
+
+// buildFilterSnippet generates Python code that builds an hsfs Filter from a simple expression.
+// Uses fv.query.featuregroups to get Feature objects with proper FG references.
+// Supports: "price > 100", "price > 50 AND product == Laptop", "status != failed OR price >= 10"
+func buildFilterSnippet(filter string) string {
+	var sb strings.Builder
+	// Build a lookup dict of feature name → Feature object from the FV's query
+	sb.WriteString(`
+_fg_features = {}
+for _fg in fv.query.featuregroups:
+    for _feat in _fg.features:
+        _fg_features[_feat.name.lower()] = _fg[_feat.name]
+`)
+	// Split on AND/OR to support compound filters
+	parts := splitFilterExpression(filter)
+	for i, part := range parts {
+		sb.WriteString(fmt.Sprintf("_f%d = _fg_features[%q] %s %s\n", i, strings.ToLower(part.feature), part.op, part.value))
+	}
+
+	// Combine with AND/OR
+	sb.WriteString("extra_filter = _f0\n")
+	for i := 1; i < len(parts); i++ {
+		if strings.EqualFold(parts[i].conjunction, "OR") {
+			sb.WriteString(fmt.Sprintf("extra_filter = extra_filter | _f%d\n", i))
+		} else {
+			sb.WriteString(fmt.Sprintf("extra_filter = extra_filter & _f%d\n", i))
+		}
+	}
+	return sb.String()
+}
+
+type filterPart struct {
+	conjunction string // AND or OR (empty for first)
+	feature     string
+	op          string
+	value       string
+}
+
+// splitFilterExpression splits "price > 100 AND product == Laptop" into parts.
+func splitFilterExpression(expr string) []filterPart {
+	// Tokenize by splitting on AND/OR boundaries
+	tokens := strings.Fields(expr)
+	var parts []filterPart
+	var conj string
+	i := 0
+	for i < len(tokens) {
+		upper := strings.ToUpper(tokens[i])
+		if upper == "AND" || upper == "OR" {
+			conj = upper
+			i++
+			continue
+		}
+		// Expect: feature op value
+		if i+2 >= len(tokens) {
+			break
+		}
+		feature := tokens[i]
+		op := tokens[i+1]
+		value := tokens[i+2]
+
+		// Map user-friendly ops to Python ops
+		switch op {
+		case "=":
+			op = "=="
+		case "!=":
+			// keep as !=
+		}
+
+		// Quote string values (non-numeric)
+		if !isNumeric(value) {
+			value = fmt.Sprintf("%q", value)
+		}
+
+		parts = append(parts, filterPart{conjunction: conj, feature: feature, op: op, value: value})
+		conj = ""
+		i += 3
+	}
+	if len(parts) == 0 {
+		// Fallback: treat entire expression as a single condition
+		parts = append(parts, filterPart{feature: expr, op: "!=", value: "None"})
+	}
+	return parts
+}
+
+func isNumeric(s string) bool {
+	for i, c := range s {
+		if c == '-' && i == 0 {
+			continue
+		}
+		if c == '.' {
+			continue
+		}
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
 }
 
 // parseSplitSpec parses "train:0.8,test:0.2" into (testSize, validationSize).
@@ -511,6 +630,9 @@ func init() {
 	tdComputeCmd.Flags().StringVar(&tdComputeFormat, "format", "parquet", "Data format (parquet, csv, tfrecord)")
 	tdComputeCmd.Flags().StringVar(&tdComputeDesc, "description", "", "Description")
 	tdComputeCmd.Flags().StringVar(&tdComputeSplit, "split", "", `Split spec: "train:0.8,test:0.2"`)
+	tdComputeCmd.Flags().StringVar(&tdComputeFilter, "filter", "", `Filter rows: "price > 100", "price > 50 AND product == Laptop"`)
+	tdComputeCmd.Flags().StringVar(&tdComputeStartTime, "start-time", "", "Start time filter (e.g. 2026-01-01)")
+	tdComputeCmd.Flags().StringVar(&tdComputeEndTime, "end-time", "", "End time filter (e.g. 2026-02-01)")
 
 	tdReadCmd.Flags().IntVar(&tdReadVersion, "td-version", 0, "Training dataset version (required)")
 	tdReadCmd.Flags().StringVar(&tdReadOutput, "output", "", "Save to file (.parquet, .csv, .json)")

@@ -63,6 +63,8 @@ hops fg search documents --vector "0.1,0.2,..." --k 5
 # Training datasets (materialize + retrieve)
 hops td compute my_view 1
 hops td compute my_view 1 --split "train:0.8,test:0.2"
+hops td compute my_view 1 --filter "price > 100"
+hops td compute my_view 1 --start-time "2026-01-01" --end-time "2026-02-01"
 hops td read my_view 1 --td-version 1 --output train.parquet
 
 # Transformations
@@ -141,7 +143,7 @@ hops context
 | `hops login` | Authenticate with Hopsworks |
 | `hops project list\|use\|info` | Manage projects |
 | `hops fs list` | List feature stores |
-| `hops fg list\|info\|preview\|features\|create\|create-external\|delete\|insert\|derive\|search` | Feature groups (with embeddings + KNN) |
+| `hops fg list\|info\|preview\|features\|stats\|create\|create-external\|delete\|insert\|derive\|search` | Feature groups (with embeddings + KNN) |
 | `hops connector list\|info\|test\|databases\|tables\|preview\|create\|delete` | Storage connectors (Snowflake, JDBC, S3) |
 | `hops fv list\|info\|create\|get\|read\|delete` | Feature views (joins + transforms + online/batch read) |
 | `hops transformation list\|create` | Transformation functions |

@@ -198,6 +198,9 @@ hops td list <fv-name> <fv-version>       # List training datasets
 hops td create <fv-name> <fv-version>     # Create training dataset (metadata only)
 hops td compute <fv-name> <fv-version>    # Materialize training data (Spark job)
 hops td compute <fv-name> <fv-version> --split "train:0.8,test:0.2"  # With splits
+hops td compute <fv-name> <fv-version> --filter "price > 100"        # Filter rows
+hops td compute <fv-name> <fv-version> --filter "price > 50 AND product == Laptop"
+hops td compute <fv-name> <fv-version> --start-time "2026-01-01" --end-time "2026-02-01"
 hops td read <fv-name> <fv-version> --td-version N  # Read training data
 hops td read <fv-name> <fv-version> --td-version N --split train --output train.csv
 hops td delete <fv-name> <fv-version> <td-version>  # Delete
