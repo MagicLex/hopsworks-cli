@@ -101,15 +101,53 @@ result_batches = self.query_engine.read_query(query, is_query_signed=has_encrypt
 
 This is safe because TD creation is already authenticated via client certificates and peer identity validation.
 
+### Bug 4c: External FG source queries don't push down LIMIT
+
+`sql_query_engine.py` fetches the entire external table before DuckDB applies `FETCH NEXT N ROWS ONLY`. For large tables (e.g. 5.4B rows), the preview hangs/times out because Arrow Flight tries to download everything from Snowflake/BigQuery/etc.
+
+**File**: `query_engine.py` (caller) + `engine/sql_query_engine.py` (source fetch)
+
+**Fix**: Extract the LIMIT from the outer DuckDB query and push it down to the source connector query.
+
+In `query_engine.py`, `read_query()`:
+```python
+import re
+
+# Before _register_featuregroups:
+source_limit = None
+if external_featuregroup_connectors:
+    m = re.search(r'FETCH\s+NEXT\s+(\d+)\s+ROWS?\s+ONLY', query_string, re.IGNORECASE)
+    if not m:
+        m = re.search(r'LIMIT\s+(\d+)', query_string, re.IGNORECASE)
+    if m:
+        source_limit = int(m.group(1))
+
+# Pass to _register_featuregroups → sql_engine.register(source_limit=source_limit)
+```
+
+In `engine/sql_query_engine.py`, `register()` and `_ibis()`/`_redshift()`:
+```python
+def register(self, ..., source_limit=None):
+    # pass source_limit to _ibis/_redshift
+
+def _ibis(self, ..., source_limit=None):
+    query = f"SELECT {feature_string} FROM ({connector_query})"
+    if source_limit is not None:
+        query += f" LIMIT {source_limit}"
+```
+
+**Result**: Preview of 5.4B-row Snowflake table goes from infinite timeout → ~5 seconds. Affects both CLI and UI preview.
+
 ### Applied as ConfigMap overlay
 
-Both fixes are deployed as a ConfigMap mount on the ArrowFlight deployment:
+All three fixes (4a, 4b, 4c) are deployed as a ConfigMap mount on the ArrowFlight deployment:
 
 ```bash
 # ConfigMap: arrowflight-query-engine-patch
 # Mounts:
 #   query_engine.py → /usr/src/app/src/query_engine.py
 #   arrow_dataset_reader_writer.py → /usr/src/app/src/arrow_dataset_reader_writer.py
+#   sql_query_engine.py → /usr/src/app/src/engine/sql_query_engine.py
 ```
 
 **To remove the patch** (e.g. after a backend upgrade that includes the fix):
