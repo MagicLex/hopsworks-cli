@@ -42,6 +42,9 @@ hops fg preview <name> [--n 10]           # Preview data rows
 hops fg features <name>                   # List features with types
 hops fg stats <name> [--version N]        # Show/compute statistics
 hops fg search <name> --vector "0.1,..."  # KNN similarity search
+hops fg keywords <name>                   # List keywords (visual tags)
+hops fg add-keyword <name> <kw> [kw...]  # Add keywords
+hops fg remove-keyword <name> <keyword>  # Remove a keyword
 hops fg delete <name> --version N         # Delete
 ```
 

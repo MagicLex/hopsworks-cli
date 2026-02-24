@@ -463,6 +463,127 @@ var fgDeleteCmd = &cobra.Command{
 	},
 }
 
+var fgKeywordsCmd = &cobra.Command{
+	Use:   "keywords <name>",
+	Short: "List keywords for a feature group",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := mustClient()
+		if err != nil {
+			return err
+		}
+
+		fg, err := c.GetFeatureGroup(args[0], fgVersion)
+		if err != nil {
+			return err
+		}
+
+		keywords, err := c.GetFeatureGroupKeywords(fg.ID)
+		if err != nil {
+			return err
+		}
+
+		if output.JSONMode {
+			output.PrintJSON(keywords)
+			return nil
+		}
+
+		if len(keywords) == 0 {
+			output.Info("No keywords on '%s' v%d", fg.Name, fg.Version)
+			return nil
+		}
+
+		headers := []string{"KEYWORD"}
+		var rows [][]string
+		for _, kw := range keywords {
+			rows = append(rows, []string{kw})
+		}
+		output.Table(headers, rows)
+		return nil
+	},
+}
+
+var fgAddKeywordCmd = &cobra.Command{
+	Use:   "add-keyword <name> <keyword> [keyword...]",
+	Short: "Add keywords to a feature group",
+	Args:  cobra.MinimumNArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := mustClient()
+		if err != nil {
+			return err
+		}
+
+		fg, err := c.GetFeatureGroup(args[0], fgVersion)
+		if err != nil {
+			return err
+		}
+
+		// Get existing keywords so we merge (POST replaces all)
+		existing, err := c.GetFeatureGroupKeywords(fg.ID)
+		if err != nil {
+			return err
+		}
+
+		seen := make(map[string]bool)
+		for _, kw := range existing {
+			seen[kw] = true
+		}
+		for _, kw := range args[1:] {
+			if !seen[kw] {
+				existing = append(existing, kw)
+				seen[kw] = true
+			}
+		}
+
+		updated, err := c.ReplaceFeatureGroupKeywords(fg.ID, existing)
+		if err != nil {
+			return err
+		}
+
+		if output.JSONMode {
+			output.PrintJSON(updated)
+			return nil
+		}
+
+		output.Success("Keywords on '%s' v%d: %v", fg.Name, fg.Version, updated)
+		return nil
+	},
+}
+
+var fgRemoveKeywordCmd = &cobra.Command{
+	Use:   "remove-keyword <name> <keyword>",
+	Short: "Remove a keyword from a feature group",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := mustClient()
+		if err != nil {
+			return err
+		}
+
+		fg, err := c.GetFeatureGroup(args[0], fgVersion)
+		if err != nil {
+			return err
+		}
+
+		if err := c.DeleteFeatureGroupKeyword(fg.ID, args[1]); err != nil {
+			return err
+		}
+
+		if output.JSONMode {
+			// Re-fetch to show current state
+			keywords, err := c.GetFeatureGroupKeywords(fg.ID)
+			if err != nil {
+				return err
+			}
+			output.PrintJSON(keywords)
+			return nil
+		}
+
+		output.Success("Removed keyword '%s' from '%s' v%d", args[1], fg.Name, fg.Version)
+		return nil
+	},
+}
+
 // parseEmbeddingSpecs parses --embedding flags into EmbeddingFeatures + schema Features.
 // Format: "col_name:dimension[:metric]" where metric is l2, cosine, or dot_product.
 func parseEmbeddingSpecs(specs []string) ([]client.EmbeddingFeature, []client.Feature, error) {
@@ -528,6 +649,9 @@ func init() {
 	fgStatsCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version")
 	fgStatsCmd.Flags().StringVar(&fgStatsFeatures, "features", "", "Filter to specific features (comma-separated)")
 	fgStatsCmd.Flags().BoolVar(&fgStatsCompute, "compute", false, "Trigger statistics computation (Spark job)")
+	fgKeywordsCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version")
+	fgAddKeywordCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version")
+	fgRemoveKeywordCmd.Flags().IntVar(&fgVersion, "version", 0, "Feature group version")
 
 	fgCmd.AddCommand(fgListCmd)
 	fgCmd.AddCommand(fgInfoCmd)
@@ -536,6 +660,9 @@ func init() {
 	fgCmd.AddCommand(fgCreateCmd)
 	fgCmd.AddCommand(fgDeleteCmd)
 	fgCmd.AddCommand(fgStatsCmd)
+	fgCmd.AddCommand(fgKeywordsCmd)
+	fgCmd.AddCommand(fgAddKeywordCmd)
+	fgCmd.AddCommand(fgRemoveKeywordCmd)
 }
 
 // Helper: create client with project validation

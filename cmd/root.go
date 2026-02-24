@@ -10,7 +10,7 @@ import (
 )
 
 // Version is set at build time via -ldflags
-var Version = "0.8.6"
+var Version = "0.8.7"
 
 var (
 	cfg       *config.Config

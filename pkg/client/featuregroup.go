@@ -219,6 +219,53 @@ func (c *Client) DeleteFeatureGroup(fgID int) error {
 	return err
 }
 
+// KeywordDTO matches the backend's KeywordDTO — a list of plain strings.
+type KeywordDTO struct {
+	Keywords []string `json:"keywords"`
+}
+
+func (c *Client) GetFeatureGroupKeywords(fgID int) ([]string, error) {
+	path := fmt.Sprintf("%s/featuregroups/%d/keywords", c.FSPath(), fgID)
+	data, err := c.Get(path)
+	if err != nil {
+		return nil, err
+	}
+	var dto KeywordDTO
+	if err := json.Unmarshal(data, &dto); err != nil {
+		return nil, fmt.Errorf("parse keywords: %w", err)
+	}
+	if dto.Keywords == nil {
+		return []string{}, nil
+	}
+	return dto.Keywords, nil
+}
+
+func (c *Client) ReplaceFeatureGroupKeywords(fgID int, keywords []string) ([]string, error) {
+	body, err := json.Marshal(KeywordDTO{Keywords: keywords})
+	if err != nil {
+		return nil, fmt.Errorf("marshal keywords: %w", err)
+	}
+	path := fmt.Sprintf("%s/featuregroups/%d/keywords", c.FSPath(), fgID)
+	data, err := c.Post(path, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	var dto KeywordDTO
+	if err := json.Unmarshal(data, &dto); err != nil {
+		return nil, fmt.Errorf("parse keywords: %w", err)
+	}
+	if dto.Keywords == nil {
+		return []string{}, nil
+	}
+	return dto.Keywords, nil
+}
+
+func (c *Client) DeleteFeatureGroupKeyword(fgID int, keyword string) error {
+	path := fmt.Sprintf("%s/featuregroups/%d/keywords?keyword=%s", c.FSPath(), fgID, keyword)
+	_, err := c.Delete(path)
+	return err
+}
+
 // ParsePrimaryKeys marks features as primary in a feature list
 func ParseFeatures(featureNames []string, types []string, primaryKeys []string) []Feature {
 	pkSet := make(map[string]bool)

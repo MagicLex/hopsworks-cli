@@ -32,6 +32,11 @@ hops fg info customer_transactions
 hops fg preview customer_transactions --n 5
 hops fg features customer_transactions
 
+# Keywords (visual tags for feature groups)
+hops fg keywords customer_transactions
+hops fg add-keyword customer_transactions ml production
+hops fg remove-keyword customer_transactions production
+
 # Feature views (single FG or multi-FG joins + transforms)
 hops fv list
 hops fv create my_view --feature-group transactions
@@ -143,7 +148,7 @@ hops context
 | `hops login` | Authenticate with Hopsworks |
 | `hops project list\|use\|info` | Manage projects |
 | `hops fs list` | List feature stores |
-| `hops fg list\|info\|preview\|features\|stats\|create\|create-external\|delete\|insert\|derive\|search` | Feature groups (with embeddings + KNN) |
+| `hops fg list\|info\|preview\|features\|stats\|keywords\|add-keyword\|remove-keyword\|create\|create-external\|delete\|insert\|derive\|search` | Feature groups (with embeddings + KNN + keywords) |
 | `hops connector list\|info\|test\|databases\|tables\|preview\|create\|delete` | Storage connectors (Snowflake, JDBC, S3) |
 | `hops fv list\|info\|create\|get\|read\|delete` | Feature views (joins + transforms + online/batch read) |
 | `hops transformation list\|create` | Transformation functions |
