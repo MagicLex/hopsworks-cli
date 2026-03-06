@@ -27,6 +27,7 @@ API specs, test accounts, cluster ops.
 
 | Doc | Covers |
 |-----|--------|
+| [reference/command-backends.md](reference/command-backends.md) | Which commands hit REST directly vs shell out to Python SDK. |
 | [reference/feature-store-api.md](reference/feature-store-api.md) | Feature Store REST API endpoint reference. |
 | [reference/snowflake-test.md](reference/snowflake-test.md) | Snowflake test account credentials and verified CLI flow. |
 | [reference/cluster-ops.md](reference/cluster-ops.md) | kubectl commands, SSH, RSS troubleshooting, DDL migrations, ingress. |
